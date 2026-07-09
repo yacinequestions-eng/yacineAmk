@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # ============================================
-# TikSpark Bot v7.3 — Full Code
+# TikSpark Bot v7.2 — Full Code
 # UESM Protocol — Mo.dark Engineering
 # ============================================
 
@@ -111,8 +111,7 @@ class TikSparkBot:
                 "orderId": order_id,
                 "validationData": {
                     "attempts": attempts,
-,
-                    "                    "initialNumber": initial_number,
+                    "initialNumber": initial_number,
                     "timeSpent": time_spent
                 }
             },
@@ -224,20 +223,20 @@ bot_instance = TikSparkBot(TOKEN_TIKSPARK)
 
 # ====== تنسيقات الرسائل ======
 def format_start_message(username):
-    """/start — كل النص مغلظ وتحت خط"""
+    """/start — كل النص تحت خط"""
     return (
-        f"<b><u>[+] مـرحـبـا بــك يــا « @{username} »</u></b>\n"
+        f"<u>[+] مـرحـبـا بــك يــا « @{username} »</u>\n"
         f"\n"
-        f"<b><u>بوت جلب النقاط من TikSpark</u></b>\n"
+        f"<u>بوت جلب النقاط من TikSpark</u>\n"
         f"\n"
-        f"<b><u>{{•}} الأوامر:</u></b>\n"
-        f"<b><u>/start → عرض هذه الرسالة</u></b>\n"
-        f"<b><u>/points → جلب نقاطك</u></b>\n"
-        f"<b><u>/collect 1000 → جلب 1000 نقطة</u></b>\n"
-        f"<b><u>/collect 2000 → جلب 2000 نقطة</u></b>\n"
-        f"<b><u>/status → حالة البوت</u></b>\n"
+        f"<u>{{•}} الأوامر:</u>\n"
+        f"<u>/start → عرض هذه الرسالة</u>\n"
+        f"<u>/points → جلب نقاطك</u>\n"
+        f"<u>/collect 1000 → جلب 1000 نقطة</u>\n"
+        f"<u>/collect 2000 → جلب 2000 نقطة</u>\n"
+        f"<u>/status → حالة البوت</u>\n"
         f"\n"
-        f"<b><u>Dev by: @yacine_X6 🕸</u></b>"
+        f"<u>Dev by: @yacine_X6 🕸</u>"
     )
 
 
@@ -405,7 +404,7 @@ def main():
     app.add_handler(CommandHandler("collect", collect))
     app.add_handler(CommandHandler("status", status_cmd))
 
-    print("🕸 TikSpark Bot v7.3 Started")
+    print("🕸 TikSpark Bot v7.2 Started")
     print("👑 Dev: @yacine_X6")
     app.run_polling()
 

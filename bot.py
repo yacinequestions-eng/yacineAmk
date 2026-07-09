@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 # ============================================
-# TikSpark Bot v7.0 — Mo.dark Redesign
-# UESM Protocol — Design Match from Image
+# TikSpark Bot v7.1 — Fixed Logic + Advanced Format
+# UESM Protocol — Loop Until Target Reached
 # ============================================
 
 import logging
 import requests
 import random
 import time
-import re
+import json
 from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes
 
@@ -147,118 +147,186 @@ class TikSparkBot:
                         self.success_count += 1
                         self.total_score += score
                         return score
+            self.fail_count += 1
             return 0
         except:
+            self.fail_count += 1
             return 0
 
-    def run_cycle(self, max_orders=3):
+    # ====== المنطق الجديد: معالجة حتى الوصول للهدف ======
+    def run_until_target(self, target_score=1000, max_cycles=50):
+        """
+        يعالج طلبات متكررة حتى:
+        - الوصول للهدف المطلوب (target_score)
+        - أو نفاد الطلبات المتاحة
+        - أو الوصول لعدد الدورات الأقصى
+        """
         if self.running:
             return {"status": "already_running", "score": self.total_score}
 
         self.running = True
         self.success_count = 0
         self.fail_count = 0
+        self.total_score = 0
 
         try:
             start_score = self.fetch_score()
-            all_orders = []
-            for page in range(1, 4):
-                orders = self.fetch_orders(page)
-                if orders:
-                    all_orders.extend(orders)
-                time.sleep(0.2)
+            current_score = start_score
+            total_gained = 0
+            total_processed = 0
+            cycles = 0
 
-            if not all_orders:
-                self.running = False
-                return {"status": "no_orders", "score": start_score}
+            while total_gained < target_score and cycles < max_cycles:
+                cycles += 1
 
-            selected = random.sample(
-                all_orders, min(max_orders, len(all_orders))
-            )
-            gained = 0
+                # جلب الطلبات من جميع الصفحات
+                all_orders = []
+                for page in range(1, 4):
+                    orders = self.fetch_orders(page)
+                    if orders:
+                        all_orders.extend(orders)
+                    time.sleep(0.2)
 
-            for order in selected:
-                score = self.action_order(order['_id'])
-                gained += score
-                time.sleep(0.3)
+                if not all_orders:
+                    break  # لا توجد طلبات متاحة
+
+                # معالجة كل الطلبات المتاحة
+                for order in all_orders:
+                    if total_gained >= target_score:
+                        break
+
+                    score = self.action_order(order['_id'])
+                    total_gained += score
+                    total_processed += 1
+
+                    if score > 0:
+                        current_score += score
+
+                    time.sleep(0.3)
+
+                # فترة راحة بين الدورات
+                time.sleep(1)
 
             end_score = self.fetch_score()
             self.running = False
+
             return {
                 "status": "success",
                 "start_score": start_score,
                 "end_score": end_score,
-                "gained": gained,
-                "processed": len(selected),
+                "target": target_score,
+                "gained": total_gained,
+                "processed": total_processed,
+                "cycles": cycles,
                 "success_count": self.success_count,
-                "fail_count": self.fail_count
+                "fail_count": self.fail_count,
+                "reached_target": total_gained >= target_score
             }
+
         except Exception as e:
             self.running = False
             return {"status": "error", "error": str(e)}
 
 
-# ====== نسخة التصميم من الصورة ======
+# ====== نسخة التصميم المتقدم ======
 bot_instance = TikSparkBot(TOKEN_TIKSPARK)
 
 
 def format_start_message(username):
-    """تنسيق رسالة /start مطابقة للصورة"""
+    """تنسيق رسالة /start"""
     return (
-        f"[+] مـرحـبـا بــك يــا « @{username} »\n"
+        f"<b>[+] مـرحـبـا بــك يــا « @{username} »</b>\n"
         f"\n"
-        f"<u>بوت جلب النقاط من TikSpark</u>\n"
+        f"<u><b>بوت جلب النقاط من TikSpark</b></u>\n"
         f"\n"
-        f"{{•}} الأوامر:\n"
-        f"<u>/start</u> → عرض هذه الرسالة\n"
-        f"<u>/points</u> → جلب نقاطك\n"
-        f"<u>/collect 1000</u> → جلب 1000 نقطة\n"
-        f"<u>/collect 2000</u> → جلب 2000 نقطة\n"
-        f"<u>/status</u> → حالة البوت\n"
+        f"<b>{{•}} الأوامر:</b>\n"
+        f"<u><b>/start</b></u> → عرض هذه الرسالة\n"
+        f"<u><b>/points</b></u> → جلب نقاطك\n"
+        f"<u><b>/collect 1000</b></u> → جلب 1000 نقطة\n"
+        f"<u><b>/collect 2000</b></u> → جلب 2000 نقطة\n"
+        f"<u><b>/status</b></u> → حالة البوت\n"
         f"\n"
-        f"Dev by: @yacine_X6 🕸"
+        f"<blockquote>Dev by: @yacine_X6 🕸</blockquote>"
     )
 
 
 def format_collect_success(result):
-    """تنسيق رسالة جمع النقاط الناجح"""
+    """تنسيق رسالة جمع النقاط الناجح — مطابق للصورة"""
+    target_status = "✅ تم الوصول" if result['reached_target'] else "⚠️ لم يكتمل"
+    
     return (
-        f"[+] تـم جـلـب الـنـقـاط\n"
+        f"<b>[+] تـم جـلـب الـنـقـاط</b>\n"
         f"\n"
-        f"<u>النقاط السابقة:</u> {result['start_score']}\n"
-        f"<u>النقاط الحالية:</u> {result['end_score']}\n"
-        f"<u>الزيادة:</u> +{result['gained']} نقطة\n"
-        f"<u>تم معالجة:</u> {result['processed']} طلب\n"
-        f"<u>نجاح:</u> {result['success_count']}\n"
-        f"<u>فشل:</u> {result['fail_count']}\n"
+        f"<u><b>النقاط السابقة:</b></u> <b>{result['start_score']}</b>\n"
+        f"<u><b>النقاط الحالية:</b></u> <b>{result['end_score']}</b>\n"
+        f"<u><b>الزيادة:</b></u> <b>+{result['gained']}</b> نقطة\n"
+        f"<u><b>الهدف:</b></u> <b>{result['target']}</b> نقطة\n"
+        f"<u><b>الحالة:</b></u> <b>{target_status}</b>\n"
+        f"<u><b>تم معالجة:</b></u> <b>{result['processed']}</b> طلب\n"
+        f"<u><b>دورات:</b></u> <b>{result['cycles']}</b>\n"
+        f"<u><b>نجاح:</b></u> <b>{result['success_count']}</b>\n"
+        f"<u><b>فشل:</b></u> <b>{result['fail_count']}</b>\n"
         f"\n"
-        f"Dev by: @yacine_X6 🕸"
+        f"<blockquote>Dev by: @yacine_X6 🕸</blockquote>"
     )
 
 
 def format_points(score):
     """تنسيق رسالة النقاط"""
     return (
-        f"[+] نـقـاطـك الـحـالـيـة\n"
+        f"<b>[+] نـقـاطـك الـحـالـيـة</b>\n"
         f"\n"
-        f"<u>النقاط:</u> {score}\n"
+        f"<u><b>النقاط:</b></u> <b>{score}</b>\n"
         f"\n"
-        f"Dev by: @yacine_X6 🕸"
+        f"<blockquote>Dev by: @yacine_X6 🕸</blockquote>"
     )
 
 
 def format_status(score):
     """تنسيق رسالة الحالة"""
-    status = "يعمل" if bot_instance.running else "متوقف"
+    status = "🟢 يعمل" if bot_instance.running else "🔴 متوقف"
     return (
-        f"[+] حـالـة الـبـوت\n"
+        f"<b>[+] حـالـة الـبـوت</b>\n"
         f"\n"
-        f"<u>الحالة:</u> {status}\n"
-        f"<u>النقاط:</u> {score}\n"
-        f"<u>نجاح:</u> {bot_instance.success_count}\n"
-        f"<u>فشل:</u> {bot_instance.fail_count}\n"
+        f"<u><b>الحالة:</b></u> <b>{status}</b>\n"
+        f"<u><b>النقاط:</b></u> <b>{score}</b>\n"
+        f"<u><b>نجاح:</b></u> <b>{bot_instance.success_count}</b>\n"
+        f"<u><b>فشل:</b></u> <b>{bot_instance.fail_count}</b>\n"
         f"\n"
-        f"Dev by: @yacine_X6 🕸"
+        f"<blockquote>Dev by: @yacine_X6 🕸</blockquote>"
+    )
+
+
+def format_no_orders(score):
+    """تنسيق: لا توجد طلبات"""
+    return (
+        f"<b>[+] لا تـوجـد طـلـبـات</b>\n"
+        f"\n"
+        f"<u><b>نقاطك الحالية:</b></u> <b>{score}</b>\n"
+        f"\n"
+        f"<blockquote>Dev by: @yacine_X6 🕸</blockquote>"
+    )
+
+
+def format_error(error_msg):
+    """تنسيق: خطأ"""
+    return (
+        f"<b>[+] خـطـأ</b>\n"
+        f"\n"
+        f"<u><b>التفاصيل:</b></u> <b>{error_msg}</b>\n"
+        f"\n"
+        f"<blockquote>Dev by: @yacine_X6 🕸</blockquote>"
+    )
+
+
+def format_already_running():
+    """تنسيق: البوت يعمل"""
+    return (
+        f"<b>[+] الـبـوت يـعـمل</b>\n"
+        f"\n"
+        f"<u><b>الحالة:</b></u> <b>يعمل حالياً، انتظر حتى ينتهي</b>\n"
+        f"\n"
+        f"<blockquote>Dev by: @yacine_X6 🕸</blockquote>"
     )
 
 
@@ -278,66 +346,59 @@ async def points(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text = format_points(score)
         await msg.edit_text(text, parse_mode="HTML")
     else:
-        await msg.edit_text(
-            "[+] خـطـأ\n\nفشل جلب النقاط\n\nDev by: @yacine_X6 🕸",
-            parse_mode="HTML"
-        )
+        text = format_error("فشل جلب النقاط")
+        await msg.edit_text(text, parse_mode="HTML")
 
 
 async def collect(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if user_id != ADMIN_ID:
-        await update.message.reply_text(
-            "[+] هـذا الأمـر للـمـطـور فـقـط\n\nDev by: @yacine_X6 🕸",
-            parse_mode="HTML"
+        text = (
+            f"<b>[+] هـذا الأمـر للـمـطـور فـقـط</b>\n"
+            f"\n"
+            f"<blockquote>Dev by: @yacine_X6 🕸</blockquote>"
         )
+        await update.message.reply_text(text, parse_mode="HTML")
         return
 
     if bot_instance.running:
-        await update.message.reply_text(
-            "[+] الـبـوت يـعـمل حـالـيـاً\n\nDev by: @yacine_X6 🕸",
-            parse_mode="HTML"
-        )
+        text = format_already_running()
+        await update.message.reply_text(text, parse_mode="HTML")
         return
 
-    # استخراج العدد
+    # استخراج الهدف
     try:
         parts = update.message.text.split()
         if len(parts) > 1:
-            max_orders = int(parts[1]) // 100
-            if max_orders < 1:
-                max_orders = 1
-            if max_orders > 20:
-                max_orders = 20
+            target = int(parts[1])
+            if target < 100:
+                target = 100
+            if target > 10000:
+                target = 10000
         else:
-            max_orders = 3
+            target = 1000
     except:
-        max_orders = 3
+        target = 1000
 
-    msg = await update.message.reply_text("⏳ جاري جلب النقاط...")
+    msg = await update.message.reply_text(
+        f"<b>[+] جـاري الـعـمـل</b>\n\n"
+        f"<u><b>الهدف:</b></u> <b>{target}</b> نقطة\n"
+        f"<u><b>الحالة:</b></u> <b>جاري المعالجة...</b>\n\n"
+        f"<blockquote>Dev by: @yacine_X6 🕸</blockquote>",
+        parse_mode="HTML"
+    )
 
-    result = bot_instance.run_cycle(max_orders=max_orders)
+    # المنطق الجديد: معالجة حتى الوصول للهدف
+    result = bot_instance.run_until_target(target_score=target, max_cycles=50)
 
     if result["status"] == "success":
         text = format_collect_success(result)
     elif result["status"] == "no_orders":
-        text = (
-            f"[+] لا تـوجـد طـلـبـات\n\n"
-            f"نقاطك الحالية: {result['score']}\n\n"
-            f"Dev by: @yacine_X6 🕸"
-        )
+        text = format_no_orders(result.get('score', 0))
     elif result["status"] == "already_running":
-        text = (
-            f"[+] الـبـوت يـعـمل\n\n"
-            f"انتظر حتى ينتهي\n\n"
-            f"Dev by: @yacine_X6 🕸"
-        )
+        text = format_already_running()
     else:
-        text = (
-            f"[+] خـطـأ\n\n"
-            f"{result.get('error', 'غير معروف')}\n\n"
-            f"Dev by: @yacine_X6 🕸"
-        )
+        text = format_error(result.get('error', 'غير معروف'))
 
     await msg.edit_text(text, parse_mode="HTML")
 
@@ -356,7 +417,7 @@ def main():
     app.add_handler(CommandHandler("collect", collect))
     app.add_handler(CommandHandler("status", status_cmd))
 
-    print("🕸 TikSpark Bot Started")
+    print("🕸 TikSpark Bot v7.1 Started")
     print("👑 Dev: @yacine_X6")
     app.run_polling()
 

@@ -1,150 +1,278 @@
-import threading
+import logging
+import asyncio
 import requests
-from datetime import datetime, timedelta
-from flask import Flask
-import telebot
-from telebot.types import ReplyKeyboardMarkup, KeyboardButton
-import os
+import json
+import random
+import time
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 
-# ——— إعداد البوت ———
-TOKEN = "8218468639:AAGMcdEuLI8G9J8ttSqxoTxvOpZU_jQVse0"
-bot = telebot.TeleBot(TOKEN)
+# ====== الإعدادات ======
+TOKEN = "8054736760:AAE7TlEcsO4R25LI9e2nAzUr8o9VEzqt84E"
+ADMIN_ID = 6936293942  # ضع معرفك هنا
 
-# ——— قائمة 58 ولاية الجزائر مع الإحداثيات ———
-wilayas = {
-    1: ("أدرار", 27.9, -0.3),
-    2: ("الشلف", 36.16, 1.33),
-    3: ("الأغواط", 33.8, 2.88),
-    4: ("أم البواقي", 35.88, 7.11),
-    5: ("باتنة", 35.55, 6.17),
-    6: ("بجاية", 36.75, 5.07),
-    7: ("بسكرة", 34.85, 5.73),
-    8: ("بشار", 31.61, -2.22),
-    9: ("البليدة", 36.47, 2.83),
-    10: ("البويرة", 36.38, 3.9),
-    11: ("تمنراست", 22.79, 5.52),
-    12: ("تبسة", 35.4, 8.12),
-    13: ("تلمسان", 34.88, -1.32),
-    14: ("تيارت", 35.37, 1.32),
-    15: ("تيزي وزو", 36.72, 4.05),
-    16: ("الجزائر", 36.75, 3.06),
-    17: ("الجلفة", 34.68, 3.25),
-    18: ("جيجل", 36.82, 5.75),
-    19: ("سطيف", 36.19, 5.41),
-    20: ("سعيدة", 34.84, 0.15),
-    21: ("سكيكدة", 36.88, 6.91),
-    22: ("سيدي بلعباس", 35.2, -0.63),
-    23: ("عنابة", 36.9, 7.77),
-    24: ("قالمة", 36.47, 7.43),
-    25: ("قسنطينة", 36.36, 6.61),
-    26: ("المدية", 36.27, 2.77),
-    27: ("مستغانم", 35.93, 0.09),
-    28: ("المسيلة", 35.71, 4.55),
-    29: ("معسكر", 35.39, 0.14),
-    30: ("ورقلة", 31.97, 5.34),
-    31: ("وهران", 35.69, -0.64),
-    32: ("البيض", 33.69, 1.01),
-    33: ("إليزي", 26.5, 8.47),
-    34: ("برج بوعريريج", 36.07, 4.77),
-    35: ("بومرداس", 36.77, 3.48),
-    36: ("الطارف", 36.77, 8.33),
-    37: ("تندوف", 27.67, -8.13),
-    38: ("تيسمسيلت", 35.6, 1.81),
-    39: ("الوادي", 33.37, 6.87),
-    40: ("خنشلة", 35.43, 7.15),
-    41: ("سوق أهراس", 36.28, 7.95),
-    42: ("تيبازة", 36.59, 2.45),
-    43: ("ميلة", 36.45, 6.26),
-    44: ("عين الدفلى", 36.26, 1.97),
-    45: ("النعامة", 33.27, -0.31),
-    46: ("عين تموشنت", 35.3, -1.14),
-    47: ("غرداية", 32.29, 3.67),
-    48: ("غليزان", 35.74, 0.55),
-    49: ("تيميمون", 29.26, 0.23),
-    50: ("برج باجي مختار", 21.33, 0.95),
-    51: ("أولاد جلال", 34.43, 5.73),
-    52: ("بني عباس", 30.13, -2.18),
-    53: ("عين صالح", 27.2, 2.47),
-    54: ("عين قزام", 19.57, 5.77),
-    55: ("تقرت", 33.11, 6.07),
-    56: ("جانت", 24.55, 9.48),
-    57: ("المغير", 33.95, 5.93),
-    58: ("المنيعة", 30.58, 2.87),
-}
+TOKEN_TIKSPARK = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI2YTRkMWZiOGMyY2ZkMjQxYTFlYmY4ODAiLCJyb2xlIjoiQVVUSCIsInRva2VuVmVyc2lvbiI6MSwiaWF0IjoxNzgzNDkzMDk1LCJleHAiOjE3ODQ3ODkwOTV9.h8_UIDCEIm9TECI_6zZ2qx5tJY2G-fvG1VXLrnUVqZM"
 
-# ——— رسالة ترحيب مع صورة + أزرار ———
-@bot.message_handler(commands=['start'])
-def start(message):
-    photo_url = "https://i.ibb.co/bMtf1dtn/1756542339800.jpg"  
-    caption = (
-        "🎒📚 *مرحبا بكم في بوت الطقس والوقت للجزائر* 🌤🕒\n\n"
-        "📍 اختر ولايتك من الأزرار بالأسفل للحصول على حالة الطقس والوقت الحالي.\n\n"
-        "🤖 هذا البوت مصنوع من طرف *Yacine DZ* للاستعمال الشخصي ✅"
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# ====== كلاس البوت ======
+class TikSparkBot:
+    def __init__(self, token):
+        self.base_url = "https://api.tikspark.xyz/graphql"
+        self.token = token
+        self.device_info = '{"d":"62633330356361393666343862636466","n":"4954454c206974656c20413637314c43","o":"14","t":"d","v":"2.2.0","s":"0,0"}'
+        self.session = requests.Session()
+        self.total_score = 0
+        self.success_count = 0
+        self.fail_count = 0
+        self.running = False
+
+    def generate_headers(self, operation_name, operation_id):
+        timestamp = str(int(time.time() * 1000))
+        nonce = ''.join(random.choices('0123456789abcdef', k=16))
+        csrf = f"{timestamp}:{''.join(random.choices('0123456789abcdef', k=64))}"
+        return {
+            'User-Agent': "okhttp/4.12.0",
+            'Accept': "multipart/mixed; deferSpec=20220824, application/json",
+            'Accept-Encoding': "gzip",
+            'Content-Type': "application/json",
+            'x-apollo-operation-id': operation_id,
+            'x-apollo-operation-name': operation_name,
+            'x-language': "ar",
+            'x-app-name': "com.dev.vidspark",
+            'token': self.token,
+            'x-csrf-token': csrf,
+            'x-device-info': self.device_info,
+            'x-app-sig': ''.join(random.choices('0123456789abcdef', k=64)),
+            'x-app-ts': timestamp,
+            'x-app-nonce': nonce
+        }
+
+    def fetch_score(self):
+        payload = {
+            "operationName": "FetchScore",
+            "variables": {},
+            "query": "query FetchScore { fetchScore }"
+        }
+        headers = self.generate_headers("FetchScore", "88d30eeca55c0538539ad8217dfefd52b2f47015200cdbb7cb6ea5a765381d69")
+        try:
+            response = self.session.post(self.base_url, json=payload, headers=headers, timeout=10)
+            if response.status_code == 200:
+                data = response.json()
+                return data.get('data', {}).get('fetchScore', 0)
+            return 0
+        except:
+            return 0
+
+    def fetch_orders(self, page=1):
+        payload = {
+            "operationName": "FetchOrders",
+            "variables": {"page": page},
+            "query": "query FetchOrders($page: Int!) { getOrders(page: $page) { _id type videoLink tiktokerUsername avatar score priority } }"
+        }
+        headers = self.generate_headers("FetchOrders", "c2ca4b87e63f30f2cca10e5867d17ea0f1712e96e716a60513f68758b2256185")
+        try:
+            response = self.session.post(self.base_url, json=payload, headers=headers, timeout=10)
+            if response.status_code == 200:
+                data = response.json()
+                orders = data.get('data', {}).get('getOrders', [])
+                return [o for o in orders if o.get('type') != 'followers']
+            return []
+        except:
+            return []
+
+    def action_order(self, order_id):
+        attempts = random.randint(50, 100)
+        initial_number = random.uniform(50000, 150000)
+        time_spent = random.uniform(600000, 1800000)
+
+        payload = {
+            "operationName": "ActionOrder",
+            "variables": {
+                "orderId": order_id,
+                "validationData": {
+                    "attempts": attempts,
+                    "initialNumber": initial_number,
+                    "timeSpent": time_spent
+                }
+            },
+            "query": """
+            mutation ActionOrder($orderId: ID!, $validationData: ValidationDataInput!) {
+                actionOrder(orderId: $orderId, validationData: $validationData) {
+                    score
+                    taskProgress {
+                        count
+                        startTime
+                        taskProgressLimit
+                    }
+                }
+            }
+            """
+        }
+        headers = self.generate_headers("ActionOrder", "ddfbb49865193fd38840a34b92139f1759a71331e374bb1254f8e2352630e8f2")
+
+        try:
+            response = self.session.post(self.base_url, json=payload, headers=headers, timeout=10)
+            if response.status_code == 200:
+                data = response.json()
+                action_data = data.get('data', {}).get('actionOrder')
+                if action_data and isinstance(action_data, dict):
+                    score = action_data.get('score', 0)
+                    if score > 0:
+                        self.success_count += 1
+                        self.total_score += score
+                        return score
+            return 0
+        except:
+            return 0
+
+    def run_cycle(self, max_orders=3):
+        if self.running:
+            return {"status": "already_running", "score": self.total_score}
+
+        self.running = True
+        self.success_count = 0
+        self.fail_count = 0
+        
+        try:
+            start_score = self.fetch_score()
+            all_orders = []
+            for page in range(1, 4):
+                orders = self.fetch_orders(page)
+                if orders:
+                    all_orders.extend(orders)
+                time.sleep(0.2)
+            
+            if not all_orders:
+                self.running = False
+                return {"status": "no_orders", "score": start_score}
+            
+            selected = random.sample(all_orders, min(max_orders, len(all_orders)))
+            gained = 0
+            
+            for order in selected:
+                score = self.action_order(order['_id'])
+                gained += score
+                time.sleep(0.3)
+            
+            end_score = self.fetch_score()
+            self.running = False
+            return {
+                "status": "success",
+                "start_score": start_score,
+                "end_score": end_score,
+                "gained": gained,
+                "processed": len(selected),
+                "success_count": self.success_count,
+                "fail_count": self.fail_count
+            }
+        except Exception as e:
+            self.running = False
+            return {"status": "error", "error": str(e)}
+
+# ====== البوت تليجرام ======
+bot_instance = TikSparkBot(TOKEN_TIKSPARK)
+
+def format_message(result):
+    """تنسيق الرسالة مع تغليض، تسطير، واقتباس"""
+    if result["status"] == "success":
+        lines = [
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+            "🔥 <b>تـم جـلـب الـنـقـاط بـنـجـاح</b> 🔥",
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+            f"<b>💰 النقاط السابقة:</b> <code>{result['start_score']}</code>",
+            f"<b>💰 النقاط الحالية:</b> <code>{result['end_score']}</code>",
+            f"<b>📈 الزيادة:</b> <code>+{result['gained']}</code> نقطة",
+            f"<b>📊 تم معالجة:</b> <code>{result['processed']}</code> طلب",
+            f"<b>✅ نجاح:</b> <code>{result['success_count']}</code>",
+            f"<b>❌ فشل:</b> <code>{result['fail_count']}</code>",
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+            "<i>👑 Dev by: @yacine_X6</i>"
+        ]
+        return "\n".join(lines)
+    elif result["status"] == "no_orders":
+        return f"❌ <b>لا توجد طلبات متاحة حالياً</b>\n💰 نقاطك الحالية: <code>{result['score']}</code>"
+    elif result["status"] == "already_running":
+        return "⚠️ <b>البوت يعمل حالياً، انتظر حتى ينتهي</b>"
+    else:
+        return f"❌ <b>خطأ:</b> <code>{result.get('error', 'غير معروف')}</code>"
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    await update.message.reply_text(
+        f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"🔥 <b>مــــرحبا  بـــــك  يـــا « @{user.username} »</b> 🔥\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"       <b>#TIKSPARK_POINTS_BOT</b> 💰\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"⚡️ <b>بوت جلب النقاط من تطبيق TikSpark</b>\n"
+        f"📌 <u><b>الأوامر المتاحة:</b></u>\n"
+        f"  /start → عرض هذه الرسالة\n"
+        f"  /points → جلب نقاطك الحالية\n"
+        f"  /collect → تشغيل دورة لجلب النقاط\n"
+        f"  /status → حالة البوت\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"<i>👑 Dev by: @yacine_X6</i>",
+        parse_mode="HTML"
     )
-    markup = ReplyKeyboardMarkup(row_width=3, resize_keyboard=True)
-    buttons = [KeyboardButton(f"{num} - {wilayas[num][0]}") for num in wilayas]
-    buttons.append(KeyboardButton("ℹ️ عن البوت"))
-    markup.add(*buttons)
-    bot.send_photo(message.chat.id, photo=photo_url, caption=caption, parse_mode="Markdown", reply_markup=markup)
 
-# ——— استقبال اختيار ولاية من الأزرار ———
-@bot.message_handler(func=lambda msg: any(msg.text.startswith(str(num)) for num in wilayas))
-def weather_by_button(message):
-    try:
-        num = int(message.text.split(" - ")[0])
-        if num in wilayas:
-            name, lat, lon = wilayas[num]
-            url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current_weather=true"
-            resp = requests.get(url, timeout=10).json()
-            cw = resp.get("current_weather", {})
-            temp = cw.get("temperature")
-            wind = cw.get("windspeed")
-            local_time = (datetime.utcnow() + timedelta(hours=1)).strftime("%H:%M:%S")
-            bot.send_message(
-                message.chat.id,
-                f"🌍 *{name}*\n\n"
-                f"🕒 الوقت الآن: {local_time}\n"
-                f"🌡 الحرارة: {temp}°C\n"
-                f"💨 سرعة الرياح: {wind} م/ث",
-                parse_mode="Markdown"
-            )
-    except:
-        bot.send_message(message.chat.id, "⚠ لم أستطع جلب الطقس الآن.")
+async def points(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    msg = await update.message.reply_text("⏳ <b>جاري جلب النقاط...</b>", parse_mode="HTML")
+    score = bot_instance.fetch_score()
+    if score is not None:
+        await msg.edit_text(
+            f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"💰 <b>نقاطك الحالية:</b> <code>{score}</code> نقطة\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+            parse_mode="HTML"
+        )
+    else:
+        await msg.edit_text("❌ <b>فشل جلب النقاط</b>", parse_mode="HTML")
 
-# ——— زر "عن البوت" ———
-@bot.message_handler(func=lambda msg: msg.text == "ℹ️ عن البوت")
-def about(message):
-    bot.send_message(
-        message.chat.id,
-        "ℹ️ *عن البوت*\n\n"
-        "✅ هذا البوت مخصص لعرض حالة الطقس والوقت الحالي في كل ولايات الجزائر.\n\n"
-        "📌 طريقة الاستخدام:\n"
-        "1. اضغط على زر ولايتك من القائمة.\n"
-        "2. سيظهر لك الطقس + الوقت المحلي.\n"
-        "3. يمكن العودة للوحة الأزرار في أي وقت عبر أمر /start.\n\n"
-        "👨‍💻 *بوت من طرف Yacine DZ للاستعمال الشخصي* ✅",
-        parse_mode="Markdown"
+async def collect(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    if user_id != ADMIN_ID:
+        await update.message.reply_text("❌ <b>هذا الأمر للمطور فقط!</b>", parse_mode="HTML")
+        return
+
+    if bot_instance.running:
+        await update.message.reply_text("⚠️ <b>البوت يعمل حالياً، انتظر حتى ينتهي</b>", parse_mode="HTML")
+        return
+
+    msg = await update.message.reply_text("⏳ <b>جاري جلب النقاط...</b>", parse_mode="HTML")
+    
+    result = bot_instance.run_cycle(max_orders=3)
+    formatted = format_message(result)
+    await msg.edit_text(formatted, parse_mode="HTML")
+
+async def status_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    score = bot_instance.fetch_score()
+    status = "🟢 يعمل" if bot_instance.running else "🔴 متوقف"
+    await update.message.reply_text(
+        f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"📊 <b>حالة البوت</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"⚡️ <b>الحالة:</b> {status}\n"
+        f"💰 <b>النقاط الحالية:</b> <code>{score}</code>\n"
+        f"✅ <b>إجمالي النجاح:</b> <code>{bot_instance.success_count}</code>\n"
+        f"❌ <b>إجمالي الفشل:</b> <code>{bot_instance.fail_count}</code>\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"<i>👑 Dev by: @yacine_X6</i>",
+        parse_mode="HTML"
     )
 
-# ——— Flask Server ———
-app = Flask(__name__)
+def main():
+    app = Application.builder().token(TOKEN).build()
+    
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("points", points))
+    app.add_handler(CommandHandler("collect", collect))
+    app.add_handler(CommandHandler("status", status_cmd))
+    
+    print("🔥 بوت تيك سبارك شغال...")
+    print(f"👑 المطور: @yacine_X6")
+    app.run_polling()
 
-@app.route('/')
-def home():
-    return "🤖 Bot is running!"
-
-def run_flask():
-    port = int(os.environ.get("PORT", 10000))  # <-- تعديل هنا
-    app.run(host="0.0.0.0", port=port)
-
-def run_bot():
-    bot.infinity_polling()
-
-# ——— تشغيل البوت + Flask ———
 if __name__ == "__main__":
-    try:
-        threading.Thread(target=run_flask).start()
-        print("🤖 البوت يعمل الآن...")
-        run_bot()
-    except Exception as e:
-        print("❌ خطأ أثناء تشغيل البوت:", e)
+    main()

@@ -4,12 +4,13 @@ import requests
 import json
 import random
 import time
+import re
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 
 # ====== الإعدادات ======
 TOKEN = "8054736760:AAE7TlEcsO4R25LI9e2nAzUr8o9VEzqt84E"
-ADMIN_ID = 6936293942  # ضع معرفك هنا
+ADMIN_ID = 6936293942
 
 TOKEN_TIKSPARK = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI2YTRkMWZiOGMyY2ZkMjQxYTFlYmY4ODAiLCJyb2xlIjoiQVVUSCIsInRva2VuVmVyc2lvbiI6MSwiaWF0IjoxNzgzNDkzMDk1LCJleHAiOjE3ODQ3ODkwOTV9.h8_UIDCEIm9TECI_6zZ2qx5tJY2G-fvG1VXLrnUVqZM"
 
@@ -174,91 +175,104 @@ class TikSparkBot:
 # ====== البوت تليجرام ======
 bot_instance = TikSparkBot(TOKEN_TIKSPARK)
 
-def format_message(result):
-    """تنسيق الرسالة مع تغليض، تسطير، واقتباس"""
+def format_message(result, user_requested=0):
+    """تنسيق الرسالة مع اقتباس وتسطير"""
     if result["status"] == "success":
         lines = [
-            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
-            "🔥 <b>تـم جـلـب الـنـقـاط بـنـجـاح</b> 🔥",
-            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
-            f"<b>💰 النقاط السابقة:</b> <code>{result['start_score']}</code>",
-            f"<b>💰 النقاط الحالية:</b> <code>{result['end_score']}</code>",
-            f"<b>📈 الزيادة:</b> <code>+{result['gained']}</code> نقطة",
-            f"<b>📊 تم معالجة:</b> <code>{result['processed']}</code> طلب",
-            f"<b>✅ نجاح:</b> <code>{result['success_count']}</code>",
-            f"<b>❌ فشل:</b> <code>{result['fail_count']}</code>",
-            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
-            "<i>👑 Dev by: @yacine_X6</i>"
+            "════════════════════════════════════════╕",
+            "<b>﴿•﴾ تـم جـلـب الـنـقـاط</b>",
+            "════════════════════════════════════════╕",
+            f"<b>﴿•﴾ النقاط السابقة:</b> <code>{result['start_score']}</code>",
+            f"<b>﴿•﴾ النقاط الحالية:</b> <code>{result['end_score']}</code>",
+            f"<b>﴿•﴾ الزيادة:</b> <code>+{result['gained']}</code> نقطة",
+            f"<b>﴿•﴾ تم معالجة:</b> <code>{result['processed']}</code> طلب",
+            f"<b>﴿•﴾ نجاح:</b> <code>{result['success_count']}</code>",
+            f"<b>﴿•﴾ فشل:</b> <code>{result['fail_count']}</code>",
+            "════════════════════════════════════════╕",
+            "<blockquote>👑 Dev by: @yacine_X6</blockquote>"
         ]
         return "\n".join(lines)
     elif result["status"] == "no_orders":
-        return f"❌ <b>لا توجد طلبات متاحة حالياً</b>\n💰 نقاطك الحالية: <code>{result['score']}</code>"
+        return f"<b>﴿•﴾ لا توجد طلبات متاحة حالياً</b>\n💰 نقاطك الحالية: <code>{result['score']}</code>"
     elif result["status"] == "already_running":
-        return "⚠️ <b>البوت يعمل حالياً، انتظر حتى ينتهي</b>"
+        return "<b>﴿•﴾ البوت يعمل حالياً، انتظر حتى ينتهي</b>"
     else:
-        return f"❌ <b>خطأ:</b> <code>{result.get('error', 'غير معروف')}</code>"
+        return f"<b>﴿•﴾ خطأ:</b> <code>{result.get('error', 'غير معروف')}</code>"
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     await update.message.reply_text(
-        f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"🔥 <b>مــــرحبا  بـــــك  يـــا « @{user.username} »</b> 🔥\n"
-        f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"       <b>#TIKSPARK_POINTS_BOT</b> 💰\n"
-        f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"⚡️ <b>بوت جلب النقاط من تطبيق TikSpark</b>\n"
-        f"📌 <u><b>الأوامر المتاحة:</b></u>\n"
+        f"════════════════════════════════════════╕\n"
+        f"<b>﴿•﴾ مـرحـبـا بــك يــا « @{user.username} »</b>\n"
+        f"════════════════════════════════════════╕\n"
+        f"<blockquote>⚡️ بوت جلب النقاط من TikSpark</blockquote>\n"
+        f"<u><b>﴿•﴾ الأوامر:</b></u>\n"
         f"  /start → عرض هذه الرسالة\n"
-        f"  /points → جلب نقاطك الحالية\n"
-        f"  /collect → تشغيل دورة لجلب النقاط\n"
+        f"  /points → جلب نقاطك\n"
+        f"  /collect 1000 → جلب 1000 نقطة\n"
+        f"  /collect 2000 → جلب 2000 نقطة\n"
         f"  /status → حالة البوت\n"
-        f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"<i>👑 Dev by: @yacine_X6</i>",
+        f"════════════════════════════════════════╕\n"
+        f"<blockquote>👑 Dev by: @yacine_X6</blockquote>",
         parse_mode="HTML"
     )
 
 async def points(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    msg = await update.message.reply_text("⏳ <b>جاري جلب النقاط...</b>", parse_mode="HTML")
+    msg = await update.message.reply_text("⏳ جاري جلب النقاط...", parse_mode="HTML")
     score = bot_instance.fetch_score()
     if score is not None:
         await msg.edit_text(
-            f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            f"💰 <b>نقاطك الحالية:</b> <code>{score}</code> نقطة\n"
-            f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+            f"════════════════════════════════════════╕\n"
+            f"<b>﴿•﴾ نقاطك الحالية:</b> <code>{score}</code> نقطة\n"
+            f"════════════════════════════════════════╕",
             parse_mode="HTML"
         )
     else:
-        await msg.edit_text("❌ <b>فشل جلب النقاط</b>", parse_mode="HTML")
+        await msg.edit_text("<b>﴿•﴾ فشل جلب النقاط</b>", parse_mode="HTML")
 
 async def collect(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if user_id != ADMIN_ID:
-        await update.message.reply_text("❌ <b>هذا الأمر للمطور فقط!</b>", parse_mode="HTML")
+        await update.message.reply_text("<b>﴿•﴾ هذا الأمر للمطور فقط!</b>", parse_mode="HTML")
         return
 
     if bot_instance.running:
-        await update.message.reply_text("⚠️ <b>البوت يعمل حالياً، انتظر حتى ينتهي</b>", parse_mode="HTML")
+        await update.message.reply_text("<b>﴿•﴾ البوت يعمل حالياً، انتظر حتى ينتهي</b>", parse_mode="HTML")
         return
 
-    msg = await update.message.reply_text("⏳ <b>جاري جلب النقاط...</b>", parse_mode="HTML")
+    # استخراج العدد من الأمر
+    try:
+        parts = update.message.text.split()
+        if len(parts) > 1:
+            max_orders = int(parts[1]) // 100  # 1000 -> 10, 2000 -> 20
+            if max_orders < 1:
+                max_orders = 1
+            if max_orders > 20:
+                max_orders = 20
+        else:
+            max_orders = 3
+    except:
+        max_orders = 3
+
+    msg = await update.message.reply_text("⏳ جاري جلب النقاط...", parse_mode="HTML")
     
-    result = bot_instance.run_cycle(max_orders=3)
+    result = bot_instance.run_cycle(max_orders=max_orders)
     formatted = format_message(result)
     await msg.edit_text(formatted, parse_mode="HTML")
 
 async def status_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     score = bot_instance.fetch_score()
-    status = "🟢 يعمل" if bot_instance.running else "🔴 متوقف"
+    status = "يعمل" if bot_instance.running else "متوقف"
     await update.message.reply_text(
-        f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"📊 <b>حالة البوت</b>\n"
-        f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"⚡️ <b>الحالة:</b> {status}\n"
-        f"💰 <b>النقاط الحالية:</b> <code>{score}</code>\n"
-        f"✅ <b>إجمالي النجاح:</b> <code>{bot_instance.success_count}</code>\n"
-        f"❌ <b>إجمالي الفشل:</b> <code>{bot_instance.fail_count}</code>\n"
-        f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"<i>👑 Dev by: @yacine_X6</i>",
+        f"════════════════════════════════════════╕\n"
+        f"<b>﴿•﴾ حالة البوت</b>\n"
+        f"════════════════════════════════════════╕\n"
+        f"<b>﴿•﴾ الحالة:</b> {status}\n"
+        f"<b>﴿•﴾ النقاط:</b> <code>{score}</code>\n"
+        f"<b>﴿•﴾ نجاح:</b> <code>{bot_instance.success_count}</code>\n"
+        f"<b>﴿•﴾ فشل:</b> <code>{bot_instance.fail_count}</code>\n"
+        f"════════════════════════════════════════╕\n"
+        f"<blockquote>👑 Dev by: @yacine_X6</blockquote>",
         parse_mode="HTML"
     )
 
@@ -271,7 +285,7 @@ def main():
     app.add_handler(CommandHandler("status", status_cmd))
     
     print("🔥 بوت تيك سبارك شغال...")
-    print(f"👑 المطور: @yacine_X6")
+    print("👑 المطور: @yacine_X6")
     app.run_polling()
 
 if __name__ == "__main__":

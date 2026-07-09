@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
 # ============================================
-# TikSpark Bot v7.1 — Fixed Logic + Advanced Format
-# UESM Protocol — Loop Until Target Reached
+# TikSpark Bot v7.2 — Full Code
+# UESM Protocol — Mo.dark Engineering
 # ============================================
 
 import logging
 import requests
 import random
 import time
-import json
 from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes
 
@@ -25,7 +24,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-# ====== كلاس البوت ======
+# ====== كلاس TikSpark ======
 class TikSparkBot:
     def __init__(self, token):
         self.base_url = "https://api.tikspark.xyz/graphql"
@@ -153,14 +152,7 @@ class TikSparkBot:
             self.fail_count += 1
             return 0
 
-    # ====== المنطق الجديد: معالجة حتى الوصول للهدف ======
     def run_until_target(self, target_score=1000, max_cycles=50):
-        """
-        يعالج طلبات متكررة حتى:
-        - الوصول للهدف المطلوب (target_score)
-        - أو نفاد الطلبات المتاحة
-        - أو الوصول لعدد الدورات الأقصى
-        """
         if self.running:
             return {"status": "already_running", "score": self.total_score}
 
@@ -179,7 +171,6 @@ class TikSparkBot:
             while total_gained < target_score and cycles < max_cycles:
                 cycles += 1
 
-                # جلب الطلبات من جميع الصفحات
                 all_orders = []
                 for page in range(1, 4):
                     orders = self.fetch_orders(page)
@@ -188,9 +179,8 @@ class TikSparkBot:
                     time.sleep(0.2)
 
                 if not all_orders:
-                    break  # لا توجد طلبات متاحة
+                    break
 
-                # معالجة كل الطلبات المتاحة
                 for order in all_orders:
                     if total_gained >= target_score:
                         break
@@ -204,7 +194,6 @@ class TikSparkBot:
 
                     time.sleep(0.3)
 
-                # فترة راحة بين الدورات
                 time.sleep(1)
 
             end_score = self.fetch_score()
@@ -228,32 +217,32 @@ class TikSparkBot:
             return {"status": "error", "error": str(e)}
 
 
-# ====== نسخة التصميم المتقدم ======
+# ====== نسخة البوت ======
 bot_instance = TikSparkBot(TOKEN_TIKSPARK)
 
 
+# ====== تنسيقات الرسائل ======
 def format_start_message(username):
-    """تنسيق رسالة /start"""
+    """/start — كل النص تحت خط"""
     return (
-        f"<b>[+] مـرحـبـا بــك يــا « @{username} »</b>\n"
+        f"<u>[+] مـرحـبـا بــك يــا « @{username} »</u>\n"
         f"\n"
-        f"<u><b>بوت جلب النقاط من TikSpark</b></u>\n"
+        f"<u>بوت جلب النقاط من TikSpark</u>\n"
         f"\n"
-        f"<b>{{•}} الأوامر:</b>\n"
-        f"<u><b>/start</b></u> → عرض هذه الرسالة\n"
-        f"<u><b>/points</b></u> → جلب نقاطك\n"
-        f"<u><b>/collect 1000</b></u> → جلب 1000 نقطة\n"
-        f"<u><b>/collect 2000</b></u> → جلب 2000 نقطة\n"
-        f"<u><b>/status</b></u> → حالة البوت\n"
+        f"<u>{{•}} الأوامر:</u>\n"
+        f"<u>/start → عرض هذه الرسالة</u>\n"
+        f"<u>/points → جلب نقاطك</u>\n"
+        f"<u>/collect 1000 → جلب 1000 نقطة</u>\n"
+        f"<u>/collect 2000 → جلب 2000 نقطة</u>\n"
+        f"<u>/status → حالة البوت</u>\n"
         f"\n"
-        f"<blockquote>Dev by: @yacine_X6 🕸</blockquote>"
+        f"<u>Dev by: @yacine_X6 🕸</u>"
     )
 
 
 def format_collect_success(result):
-    """تنسيق رسالة جمع النقاط الناجح — مطابق للصورة"""
+    """تنسيق نجاح الجمع"""
     target_status = "✅ تم الوصول" if result['reached_target'] else "⚠️ لم يكتمل"
-    
     return (
         f"<b>[+] تـم جـلـب الـنـقـاط</b>\n"
         f"\n"
@@ -272,7 +261,7 @@ def format_collect_success(result):
 
 
 def format_points(score):
-    """تنسيق رسالة النقاط"""
+    """تنسيق النقاط"""
     return (
         f"<b>[+] نـقـاطـك الـحـالـيـة</b>\n"
         f"\n"
@@ -283,7 +272,7 @@ def format_points(score):
 
 
 def format_status(score):
-    """تنسيق رسالة الحالة"""
+    """تنسيق الحالة"""
     status = "🟢 يعمل" if bot_instance.running else "🔴 متوقف"
     return (
         f"<b>[+] حـالـة الـبـوت</b>\n"
@@ -298,7 +287,7 @@ def format_status(score):
 
 
 def format_no_orders(score):
-    """تنسيق: لا توجد طلبات"""
+    """لا توجد طلبات"""
     return (
         f"<b>[+] لا تـوجـد طـلـبـات</b>\n"
         f"\n"
@@ -309,7 +298,7 @@ def format_no_orders(score):
 
 
 def format_error(error_msg):
-    """تنسيق: خطأ"""
+    """خطأ"""
     return (
         f"<b>[+] خـطـأ</b>\n"
         f"\n"
@@ -320,7 +309,7 @@ def format_error(error_msg):
 
 
 def format_already_running():
-    """تنسيق: البوت يعمل"""
+    """البوت يعمل"""
     return (
         f"<b>[+] الـبـوت يـعـمل</b>\n"
         f"\n"
@@ -330,8 +319,7 @@ def format_already_running():
     )
 
 
-# ====== handlers تليجرام ======
-
+# ====== handlers ======
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     username = user.username or user.first_name or "مستخدم"
@@ -366,7 +354,6 @@ async def collect(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(text, parse_mode="HTML")
         return
 
-    # استخراج الهدف
     try:
         parts = update.message.text.split()
         if len(parts) > 1:
@@ -388,7 +375,6 @@ async def collect(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode="HTML"
     )
 
-    # المنطق الجديد: معالجة حتى الوصول للهدف
     result = bot_instance.run_until_target(target_score=target, max_cycles=50)
 
     if result["status"] == "success":
@@ -409,6 +395,7 @@ async def status_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(text, parse_mode="HTML")
 
 
+# ====== main ======
 def main():
     app = Application.builder().token(TOKEN).build()
 
@@ -417,7 +404,7 @@ def main():
     app.add_handler(CommandHandler("collect", collect))
     app.add_handler(CommandHandler("status", status_cmd))
 
-    print("🕸 TikSpark Bot v7.1 Started")
+    print("🕸 TikSpark Bot v7.2 Started")
     print("👑 Dev: @yacine_X6")
     app.run_polling()
 

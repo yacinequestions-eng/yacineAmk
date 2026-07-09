@@ -1,12 +1,16 @@
+#!/usr/bin/env python3
+# ============================================
+# TikSpark Bot v7.0 — Mo.dark Redesign
+# UESM Protocol — Design Match from Image
+# ============================================
+
 import logging
-import asyncio
 import requests
-import json
 import random
 import time
 import re
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
+from telegram import Update
+from telegram.ext import Application, CommandHandler, ContextTypes
 
 # ====== الإعدادات ======
 TOKEN = "8054736760:AAE7TlEcsO4R25LI9e2nAzUr8o9VEzqt84E"
@@ -14,8 +18,12 @@ ADMIN_ID = 6936293942
 
 TOKEN_TIKSPARK = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI2YTRkMWZiOGMyY2ZkMjQxYTFlYmY4ODAiLCJyb2xlIjoiQVVUSCIsInRva2VuVmVyc2lvbiI6MSwiaWF0IjoxNzgzNDkzMDk1LCJleHAiOjE3ODQ3ODkwOTV9.h8_UIDCEIm9TECI_6zZ2qx5tJY2G-fvG1VXLrnUVqZM"
 
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO
+)
 logger = logging.getLogger(__name__)
+
 
 # ====== كلاس البوت ======
 class TikSparkBot:
@@ -56,9 +64,14 @@ class TikSparkBot:
             "variables": {},
             "query": "query FetchScore { fetchScore }"
         }
-        headers = self.generate_headers("FetchScore", "88d30eeca55c0538539ad8217dfefd52b2f47015200cdbb7cb6ea5a765381d69")
+        headers = self.generate_headers(
+            "FetchScore",
+            "88d30eeca55c0538539ad8217dfefd52b2f47015200cdbb7cb6ea5a765381d69"
+        )
         try:
-            response = self.session.post(self.base_url, json=payload, headers=headers, timeout=10)
+            response = self.session.post(
+                self.base_url, json=payload, headers=headers, timeout=10
+            )
             if response.status_code == 200:
                 data = response.json()
                 return data.get('data', {}).get('fetchScore', 0)
@@ -72,9 +85,14 @@ class TikSparkBot:
             "variables": {"page": page},
             "query": "query FetchOrders($page: Int!) { getOrders(page: $page) { _id type videoLink tiktokerUsername avatar score priority } }"
         }
-        headers = self.generate_headers("FetchOrders", "c2ca4b87e63f30f2cca10e5867d17ea0f1712e96e716a60513f68758b2256185")
+        headers = self.generate_headers(
+            "FetchOrders",
+            "c2ca4b87e63f30f2cca10e5867d17ea0f1712e96e716a60513f68758b2256185"
+        )
         try:
-            response = self.session.post(self.base_url, json=payload, headers=headers, timeout=10)
+            response = self.session.post(
+                self.base_url, json=payload, headers=headers, timeout=10
+            )
             if response.status_code == 200:
                 data = response.json()
                 orders = data.get('data', {}).get('getOrders', [])
@@ -111,10 +129,15 @@ class TikSparkBot:
             }
             """
         }
-        headers = self.generate_headers("ActionOrder", "ddfbb49865193fd38840a34b92139f1759a71331e374bb1254f8e2352630e8f2")
+        headers = self.generate_headers(
+            "ActionOrder",
+            "ddfbb49865193fd38840a34b92139f1759a71331e374bb1254f8e2352630e8f2"
+        )
 
         try:
-            response = self.session.post(self.base_url, json=payload, headers=headers, timeout=10)
+            response = self.session.post(
+                self.base_url, json=payload, headers=headers, timeout=10
+            )
             if response.status_code == 200:
                 data = response.json()
                 action_data = data.get('data', {}).get('actionOrder')
@@ -135,7 +158,7 @@ class TikSparkBot:
         self.running = True
         self.success_count = 0
         self.fail_count = 0
-        
+
         try:
             start_score = self.fetch_score()
             all_orders = []
@@ -144,19 +167,21 @@ class TikSparkBot:
                 if orders:
                     all_orders.extend(orders)
                 time.sleep(0.2)
-            
+
             if not all_orders:
                 self.running = False
                 return {"status": "no_orders", "score": start_score}
-            
-            selected = random.sample(all_orders, min(max_orders, len(all_orders)))
+
+            selected = random.sample(
+                all_orders, min(max_orders, len(all_orders))
+            )
             gained = 0
-            
+
             for order in selected:
                 score = self.action_order(order['_id'])
                 gained += score
                 time.sleep(0.3)
-            
+
             end_score = self.fetch_score()
             self.running = False
             return {
@@ -172,79 +197,114 @@ class TikSparkBot:
             self.running = False
             return {"status": "error", "error": str(e)}
 
-# ====== البوت تليجرام ======
+
+# ====== نسخة التصميم من الصورة ======
 bot_instance = TikSparkBot(TOKEN_TIKSPARK)
 
-def format_message(result, user_requested=0):
-    """تنسيق الرسالة مع اقتباس وتسطير"""
-    if result["status"] == "success":
-        lines = [
-            "════════════════════════════════════════╕",
-            "<b>﴿•﴾ تـم جـلـب الـنـقـاط</b>",
-            "════════════════════════════════════════╕",
-            f"<b>﴿•﴾ النقاط السابقة:</b> <code>{result['start_score']}</code>",
-            f"<b>﴿•﴾ النقاط الحالية:</b> <code>{result['end_score']}</code>",
-            f"<b>﴿•﴾ الزيادة:</b> <code>+{result['gained']}</code> نقطة",
-            f"<b>﴿•﴾ تم معالجة:</b> <code>{result['processed']}</code> طلب",
-            f"<b>﴿•﴾ نجاح:</b> <code>{result['success_count']}</code>",
-            f"<b>﴿•﴾ فشل:</b> <code>{result['fail_count']}</code>",
-            "════════════════════════════════════════╕",
-            "<blockquote>👑 Dev by: @yacine_X6</blockquote>"
-        ]
-        return "\n".join(lines)
-    elif result["status"] == "no_orders":
-        return f"<b>﴿•﴾ لا توجد طلبات متاحة حالياً</b>\n💰 نقاطك الحالية: <code>{result['score']}</code>"
-    elif result["status"] == "already_running":
-        return "<b>﴿•﴾ البوت يعمل حالياً، انتظر حتى ينتهي</b>"
-    else:
-        return f"<b>﴿•﴾ خطأ:</b> <code>{result.get('error', 'غير معروف')}</code>"
+
+def format_start_message(username):
+    """تنسيق رسالة /start مطابقة للصورة"""
+    return (
+        f"[+] مـرحـبـا بــك يــا « @{username} »\n"
+        f"\n"
+        f"<u>بوت جلب النقاط من TikSpark</u>\n"
+        f"\n"
+        f"{{•}} الأوامر:\n"
+        f"<u>/start</u> → عرض هذه الرسالة\n"
+        f"<u>/points</u> → جلب نقاطك\n"
+        f"<u>/collect 1000</u> → جلب 1000 نقطة\n"
+        f"<u>/collect 2000</u> → جلب 2000 نقطة\n"
+        f"<u>/status</u> → حالة البوت\n"
+        f"\n"
+        f"Dev by: @yacine_X6 🕸"
+    )
+
+
+def format_collect_success(result):
+    """تنسيق رسالة جمع النقاط الناجح"""
+    return (
+        f"[+] تـم جـلـب الـنـقـاط\n"
+        f"\n"
+        f"<u>النقاط السابقة:</u> {result['start_score']}\n"
+        f"<u>النقاط الحالية:</u> {result['end_score']}\n"
+        f"<u>الزيادة:</u> +{result['gained']} نقطة\n"
+        f"<u>تم معالجة:</u> {result['processed']} طلب\n"
+        f"<u>نجاح:</u> {result['success_count']}\n"
+        f"<u>فشل:</u> {result['fail_count']}\n"
+        f"\n"
+        f"Dev by: @yacine_X6 🕸"
+    )
+
+
+def format_points(score):
+    """تنسيق رسالة النقاط"""
+    return (
+        f"[+] نـقـاطـك الـحـالـيـة\n"
+        f"\n"
+        f"<u>النقاط:</u> {score}\n"
+        f"\n"
+        f"Dev by: @yacine_X6 🕸"
+    )
+
+
+def format_status(score):
+    """تنسيق رسالة الحالة"""
+    status = "يعمل" if bot_instance.running else "متوقف"
+    return (
+        f"[+] حـالـة الـبـوت\n"
+        f"\n"
+        f"<u>الحالة:</u> {status}\n"
+        f"<u>النقاط:</u> {score}\n"
+        f"<u>نجاح:</u> {bot_instance.success_count}\n"
+        f"<u>فشل:</u> {bot_instance.fail_count}\n"
+        f"\n"
+        f"Dev by: @yacine_X6 🕸"
+    )
+
+
+# ====== handlers تليجرام ======
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
-    await update.message.reply_text(
-        f"════════════════════════════════════════╕\n"
-        f"<b>﴿•﴾ مـرحـبـا بــك يــا « @{user.username} »</b>\n"
-        f"════════════════════════════════════════╕\n"
-        f"<blockquote>⚡️ بوت جلب النقاط من TikSpark</blockquote>\n"
-        f"<u><b>﴿•﴾ الأوامر:</b></u>\n"
-        f"  /start → عرض هذه الرسالة\n"
-        f"  /points → جلب نقاطك\n"
-        f"  /collect 1000 → جلب 1000 نقطة\n"
-        f"  /collect 2000 → جلب 2000 نقطة\n"
-        f"  /status → حالة البوت\n"
-        f"════════════════════════════════════════╕\n"
-        f"<blockquote>👑 Dev by: @yacine_X6</blockquote>",
-        parse_mode="HTML"
-    )
+    username = user.username or user.first_name or "مستخدم"
+    text = format_start_message(username)
+    await update.message.reply_text(text, parse_mode="HTML")
+
 
 async def points(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    msg = await update.message.reply_text("⏳ جاري جلب النقاط...", parse_mode="HTML")
+    msg = await update.message.reply_text("⏳ جاري جلب النقاط...")
     score = bot_instance.fetch_score()
     if score is not None:
+        text = format_points(score)
+        await msg.edit_text(text, parse_mode="HTML")
+    else:
         await msg.edit_text(
-            f"════════════════════════════════════════╕\n"
-            f"<b>﴿•﴾ نقاطك الحالية:</b> <code>{score}</code> نقطة\n"
-            f"════════════════════════════════════════╕",
+            "[+] خـطـأ\n\nفشل جلب النقاط\n\nDev by: @yacine_X6 🕸",
             parse_mode="HTML"
         )
-    else:
-        await msg.edit_text("<b>﴿•﴾ فشل جلب النقاط</b>", parse_mode="HTML")
+
 
 async def collect(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if user_id != ADMIN_ID:
-        await update.message.reply_text("<b>﴿•﴾ هذا الأمر للمطور فقط!</b>", parse_mode="HTML")
+        await update.message.reply_text(
+            "[+] هـذا الأمـر للـمـطـور فـقـط\n\nDev by: @yacine_X6 🕸",
+            parse_mode="HTML"
+        )
         return
 
     if bot_instance.running:
-        await update.message.reply_text("<b>﴿•﴾ البوت يعمل حالياً، انتظر حتى ينتهي</b>", parse_mode="HTML")
+        await update.message.reply_text(
+            "[+] الـبـوت يـعـمل حـالـيـاً\n\nDev by: @yacine_X6 🕸",
+            parse_mode="HTML"
+        )
         return
 
-    # استخراج العدد من الأمر
+    # استخراج العدد
     try:
         parts = update.message.text.split()
         if len(parts) > 1:
-            max_orders = int(parts[1]) // 100  # 1000 -> 10, 2000 -> 20
+            max_orders = int(parts[1]) // 100
             if max_orders < 1:
                 max_orders = 1
             if max_orders > 20:
@@ -254,39 +314,52 @@ async def collect(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except:
         max_orders = 3
 
-    msg = await update.message.reply_text("⏳ جاري جلب النقاط...", parse_mode="HTML")
-    
+    msg = await update.message.reply_text("⏳ جاري جلب النقاط...")
+
     result = bot_instance.run_cycle(max_orders=max_orders)
-    formatted = format_message(result)
-    await msg.edit_text(formatted, parse_mode="HTML")
+
+    if result["status"] == "success":
+        text = format_collect_success(result)
+    elif result["status"] == "no_orders":
+        text = (
+            f"[+] لا تـوجـد طـلـبـات\n\n"
+            f"نقاطك الحالية: {result['score']}\n\n"
+            f"Dev by: @yacine_X6 🕸"
+        )
+    elif result["status"] == "already_running":
+        text = (
+            f"[+] الـبـوت يـعـمل\n\n"
+            f"انتظر حتى ينتهي\n\n"
+            f"Dev by: @yacine_X6 🕸"
+        )
+    else:
+        text = (
+            f"[+] خـطـأ\n\n"
+            f"{result.get('error', 'غير معروف')}\n\n"
+            f"Dev by: @yacine_X6 🕸"
+        )
+
+    await msg.edit_text(text, parse_mode="HTML")
+
 
 async def status_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     score = bot_instance.fetch_score()
-    status = "يعمل" if bot_instance.running else "متوقف"
-    await update.message.reply_text(
-        f"════════════════════════════════════════╕\n"
-        f"<b>﴿•﴾ حالة البوت</b>\n"
-        f"════════════════════════════════════════╕\n"
-        f"<b>﴿•﴾ الحالة:</b> {status}\n"
-        f"<b>﴿•﴾ النقاط:</b> <code>{score}</code>\n"
-        f"<b>﴿•﴾ نجاح:</b> <code>{bot_instance.success_count}</code>\n"
-        f"<b>﴿•﴾ فشل:</b> <code>{bot_instance.fail_count}</code>\n"
-        f"════════════════════════════════════════╕\n"
-        f"<blockquote>👑 Dev by: @yacine_X6</blockquote>",
-        parse_mode="HTML"
-    )
+    text = format_status(score)
+    await update.message.reply_text(text, parse_mode="HTML")
+
 
 def main():
     app = Application.builder().token(TOKEN).build()
-    
+
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("points", points))
     app.add_handler(CommandHandler("collect", collect))
     app.add_handler(CommandHandler("status", status_cmd))
-    
-    print("🔥 بوت تيك سبارك شغال...")
-    print("👑 المطور: @yacine_X6")
+
+    print("🕸 TikSpark Bot Started")
+    print("👑 Dev: @yacine_X6")
     app.run_polling()
+
 
 if __name__ == "__main__":
     main()

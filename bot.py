@@ -1,413 +1,649 @@
 #!/usr/bin/env python3
 # ============================================
-# TikSpark Bot v7.2 — Full Code
-# UESM Protocol — Mo.dark Engineering
+# GARENA MANAGER BOT v9.0
+# Developer : @yacine_X6
+# Channel   : @UESM_Team
 # ============================================
 
 import logging
-import requests
-import random
+import os
+import sys
+import json
 import time
-from telegram import Update
-from telegram.ext import Application, CommandHandler, ContextTypes
+import hashlib
+import base64
+import urllib.parse
+from datetime import datetime
+from typing import Dict, List, Optional, Any, Tuple
 
-# ====== الإعدادات ======
-TOKEN = "8054736760:AAE7TlEcsO4R25LI9e2nAzUr8o9VEzqt84E"
-ADMIN_ID = 6936293942
+import requests
+import urllib3
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ConversationHandler, MessageHandler, ContextTypes, filters
 
-TOKEN_TIKSPARK = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI2YTRkMWZiOGMyY2ZkMjQxYTFlYmY4ODAiLCJyb2xlIjoiQVVUSCIsInRva2VuVmVyc2lvbiI6MSwiaWF0IjoxNzgzNDkzMDk1LCJleHAiOjE3ODQ3ODkwOTV9.h8_UIDCEIm9TECI_6zZ2qx5tJY2G-fvG1VXLrnUVqZM"
-
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO
-)
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+TOKEN = "8422372449:AAGZxNXJzli5pQvCJeh_rygqhAhn9dtwoPM"
+ADMIN_ID = 6936293942
 
-# ====== كلاس TikSpark ======
-class TikSparkBot:
-    def __init__(self, token):
-        self.base_url = "https://api.tikspark.xyz/graphql"
-        self.token = token
-        self.device_info = '{"d":"62633330356361393666343862636466","n":"4954454c206974656c20413637314c43","o":"14","t":"d","v":"2.2.0","s":"0,0"}'
-        self.session = requests.Session()
-        self.total_score = 0
-        self.success_count = 0
-        self.fail_count = 0
-        self.running = False
+GA_HEADERS = {"User-Agent": "GarenaMSDK/4.0.30", "Content-Type": "application/x-www-form-urlencoded", "Accept": "application/json"}
+GA_BASE = "https://100067.connect.garena.com"
+GA_APPID = "100067"
 
-    def generate_headers(self, operation_name, operation_id):
-        timestamp = str(int(time.time() * 1000))
-        nonce = ''.join(random.choices('0123456789abcdef', k=16))
-        csrf = f"{timestamp}:{''.join(random.choices('0123456789abcdef', k=64))}"
-        return {
-            'User-Agent': "okhttp/4.12.0",
-            'Accept': "multipart/mixed; deferSpec=20220824, application/json",
-            'Accept-Encoding': "gzip",
-            'Content-Type': "application/json",
-            'x-apollo-operation-id': operation_id,
-            'x-apollo-operation-name': operation_name,
-            'x-language': "ar",
-            'x-app-name': "com.dev.vidspark",
-            'token': self.token,
-            'x-csrf-token': csrf,
-            'x-device-info': self.device_info,
-            'x-app-sig': ''.join(random.choices('0123456789abcdef', k=64)),
-            'x-app-ts': timestamp,
-            'x-app-nonce': nonce
-        }
+PLATFORMS = {1: "Garena", 3: "Facebook", 4: "Guest", 5: "VK", 6: "Huawei", 7: "Apple", 8: "Google", 10: "GameCenter/Line", 11: "X", 13: "Apple ID", 28: "Line", 35: "TikTok"}
 
-    def fetch_score(self):
-        payload = {
-            "operationName": "FetchScore",
-            "variables": {},
-            "query": "query FetchScore { fetchScore }"
-        }
-        headers = self.generate_headers(
-            "FetchScore",
-            "88d30eeca55c0538539ad8217dfefd52b2f47015200cdbb7cb6ea5a765381d69"
-        )
+STATE_MENU, STATE_BIND_EMAIL, STATE_BIND_OTP, STATE_BIND_SEC, STATE_UNBIND_CHOICE, STATE_UNBIND_OTP, STATE_UNBIND_SEC, STATE_CHANGE_CHOICE, STATE_CHANGE_OLD_OTP, STATE_CHANGE_OLD_SEC, STATE_CHANGE_NEW_EMAIL, STATE_CHANGE_NEW_OTP, STATE_REVOKE_CONFIRM = range(13)
+
+_user_sessions: Dict[int, Dict[str, Any]] = {}
+_operation_log: List[Dict[str, Any]] = []
+
+def _sec_to_str(s: int) -> str:
+    d, s = divmod(s, 86400); h, s = divmod(s, 3600); m, s = divmod(s, 60)
+    return " ".join([f"{d}d" for _ in [1] if d] + [f"{h}h" for _ in [1] if h] + [f"{m}m" for _ in [1] if m] + [f"{s}s" for _ in [1] if s]) or "0s"
+
+def _log_op(uid: int, action: str, status: str, details: str = ""):
+    _operation_log.append({"timestamp": datetime.now().isoformat(), "user_id": uid, "action": action, "status": status, "details": details})
+    if len(_operation_log) > 1000: _operation_log.pop(0)
+
+class GarenaAPI:
+    def __init__(self): self.session = requests.Session(); self.session.headers.update(GA_HEADERS)
+    def _g(self, e: str, p: dict) -> requests.Response: return self.session.get(f"{GA_BASE}{e}", params=p, timeout=15, verify=False)
+    def _p(self, e: str, d: dict) -> requests.Response: return self.session.post(f"{GA_BASE}{e}", data=d, timeout=15, verify=False)
+    def player(self, t: str) -> Tuple[Optional[str], Optional[str], Optional[str]]:
         try:
-            response = self.session.post(
-                self.base_url, json=payload, headers=headers, timeout=10
-            )
-            if response.status_code == 200:
-                data = response.json()
-                return data.get('data', {}).get('fetchScore', 0)
-            return 0
-        except:
-            return 0
-
-    def fetch_orders(self, page=1):
-        payload = {
-            "operationName": "FetchOrders",
-            "variables": {"page": page},
-            "query": "query FetchOrders($page: Int!) { getOrders(page: $page) { _id type videoLink tiktokerUsername avatar score priority } }"
-        }
-        headers = self.generate_headers(
-            "FetchOrders",
-            "c2ca4b87e63f30f2cca10e5867d17ea0f1712e96e716a60513f68758b2256185"
-        )
+            r = requests.get(f"https://api-otrss.garena.com/support/callback/?access_token={t}", headers={"User-Agent": GA_HEADERS["User-Agent"]}, allow_redirects=True, timeout=15)
+            q = urllib.parse.parse_qs(urllib.parse.urlparse(r.url).query)
+            return q.get("account_id", ["Unknown"])[0], q.get("nickname", ["Unknown"])[0], q.get("region", ["Unknown"])[0]
+        except: return None, None, None
+    def bind_info(self, t: str) -> Optional[dict]:
+        try: r = self._g("/game/account_security/bind:get_bind_info", {"xMaSrY": GA_APPID, "access_token": t}); return r.json() if r.status_code == 200 else None
+        except: return None
+    def send_otp(self, e: str, t: str) -> requests.Response:
+        return self._p("/game/account_security/bind:send_otp", {"email": e, "locale": "en_PK", "region": "PK", "xMaSrY": GA_APPID, "access_token": t})
+    def verify_otp(self, e: str, o: str, t: str) -> Optional[str]:
         try:
-            response = self.session.post(
-                self.base_url, json=payload, headers=headers, timeout=10
-            )
-            if response.status_code == 200:
-                data = response.json()
-                orders = data.get('data', {}).get('getOrders', [])
-                return [o for o in orders if o.get('type') != 'followers']
-            return []
-        except:
-            return []
-
-    def action_order(self, order_id):
-        attempts = random.randint(50, 100)
-        initial_number = random.uniform(50000, 150000)
-        time_spent = random.uniform(600000, 1800000)
-
-        payload = {
-            "operationName": "ActionOrder",
-            "variables": {
-                "orderId": order_id,
-                "validationData": {
-                    "attempts": attempts,
-                    "initialNumber": initial_number,
-                    "timeSpent": time_spent
-                }
-            },
-            "query": """
-            mutation ActionOrder($orderId: ID!, $validationData: ValidationDataInput!) {
-                actionOrder(orderId: $orderId, validationData: $validationData) {
-                    score
-                    taskProgress {
-                        count
-                        startTime
-                        taskProgressLimit
-                    }
-                }
-            }
-            """
-        }
-        headers = self.generate_headers(
-            "ActionOrder",
-            "ddfbb49865193fd38840a34b92139f1759a71331e374bb1254f8e2352630e8f2"
-        )
-
+            r = self._p("/game/account_security/bind:verify_otp", {"email": e, "xMaSrY": GA_APPID, "access_token": t, "code": o, "otp": o, "type": "1"})
+            return r.json().get("verifier_token")
+        except: return None
+    def verify_identity(self, e: str, t: str, o: str = None, s: str = None) -> Optional[str]:
         try:
-            response = self.session.post(
-                self.base_url, json=payload, headers=headers, timeout=10
-            )
-            if response.status_code == 200:
-                data = response.json()
-                action_data = data.get('data', {}).get('actionOrder')
-                if action_data and isinstance(action_data, dict):
-                    score = action_data.get('score', 0)
-                    if score > 0:
-                        self.success_count += 1
-                        self.total_score += score
-                        return score
-            self.fail_count += 1
-            return 0
-        except:
-            self.fail_count += 1
-            return 0
+            d = {"email": e, "xMaSrY": GA_APPID, "access_token": t}
+            if o: d["otp"] = o
+            elif s: d["secondary_password"] = hashlib.sha256(s.encode()).hexdigest()
+            r = self._p("/game/account_security/bind:verify_identity", d); return r.json().get("identity_token")
+        except: return None
+    def create_bind(self, e: str, t: str, v: str, s: str) -> requests.Response:
+        return self._p("/game/account_security/bind:create_bind_request", {"email": e, "xMaSrY": GA_APPID, "access_token": t, "verifier_token": v, "secondary_password": s})
+    def create_unbind(self, t: str, i: str) -> requests.Response:
+        return self._p("/game/account_security/bind:create_unbind_request", {"xMaSrY": GA_APPID, "access_token": t, "identity_token": i})
+    def create_rebind(self, i: str, e: str, t: str, v: str) -> requests.Response:
+        return self._p("/game/account_security/bind:create_rebind_request", {"identity_token": i, "email": e, "xMaSrY": GA_APPID, "verifier_token": v, "access_token": t})
+    def cancel(self, t: str) -> requests.Response:
+        return self._p("/game/account_security/bind:cancel_request", {"xMaSrY": GA_APPID, "access_token": t})
+    def revoke(self, t: str) -> requests.Response:
+        return self.session.get(f"{GA_BASE}/oauth/logout?access_token={t}&refresh_token=1380dcb63ab3a077dc05bdf0b25ba4497c403a5b4eae96d7203010eafa6c83a8", headers=GA_HEADERS, timeout=15)
+    def platforms(self, t: str) -> Optional[dict]:
+        try: r = self._g("/bind/app/platform/info/get", {"access_token": t}); return r.json() if r.status_code == 200 else None
+        except: return None
 
-    def run_until_target(self, target_score=1000, max_cycles=50):
-        if self.running:
-            return {"status": "already_running", "score": self.total_score}
+_gapi = GarenaAPI()
 
-        self.running = True
-        self.success_count = 0
-        self.fail_count = 0
-        self.total_score = 0
+# ====== FORMAT FUNCTIONS (اقتباس + تغليض + تمديد النص) ======
 
-        try:
-            start_score = self.fetch_score()
-            current_score = start_score
-            total_gained = 0
-            total_processed = 0
-            cycles = 0
-
-            while total_gained < target_score and cycles < max_cycles:
-                cycles += 1
-
-                all_orders = []
-                for page in range(1, 4):
-                    orders = self.fetch_orders(page)
-                    if orders:
-                        all_orders.extend(orders)
-                    time.sleep(0.2)
-
-                if not all_orders:
-                    break
-
-                for order in all_orders:
-                    if total_gained >= target_score:
-                        break
-
-                    score = self.action_order(order['_id'])
-                    total_gained += score
-                    total_processed += 1
-
-                    if score > 0:
-                        current_score += score
-
-                    time.sleep(0.3)
-
-                time.sleep(1)
-
-            end_score = self.fetch_score()
-            self.running = False
-
-            return {
-                "status": "success",
-                "start_score": start_score,
-                "end_score": end_score,
-                "target": target_score,
-                "gained": total_gained,
-                "processed": total_processed,
-                "cycles": cycles,
-                "success_count": self.success_count,
-                "fail_count": self.fail_count,
-                "reached_target": total_gained >= target_score
-            }
-
-        except Exception as e:
-            self.running = False
-            return {"status": "error", "error": str(e)}
-
-
-# ====== نسخة البوت ======
-bot_instance = TikSparkBot(TOKEN_TIKSPARK)
-
-
-# ====== تنسيقات الرسائل ======
-def format_start_message(username):
-    """/start — كل النص تحت خط"""
+def _fmt_start(username: str) -> str:
     return (
-        f"<u>[+] مـرحـبـا بــك يــا « @{username} »</u>\n"
-        f"\n"
-        f"<u>بوت جلب النقاط من TikSpark</u>\n"
-        f"\n"
-        f"<u>{{•}} الأوامر:</u>\n"
-        f"<u>/start → عرض هذه الرسالة</u>\n"
-        f"<u>/points → جلب نقاطك</u>\n"
-        f"<u>/collect 1000 → جلب 1000 نقطة</u>\n"
-        f"<u>/collect 2000 → جلب 2000 نقطة</u>\n"
-        f"<u>/status → حالة البوت</u>\n"
-        f"\n"
-        f"<u>Dev by: @yacine_X6 🕸</u>"
+        "<blockquote>"
+        "<b>مـــــرحبا بــــك يــا @{}</b>\n\n"
+        "<b>بــوت إدارة حــسابات Garena</b>\n\n"
+        "<b>الأوامر المتاحة:</b>\n"
+        "<b>/start</b> عرض الواجهة\n"
+        "<b>/info</b> معلومات اللاعب\n"
+        "<b>/bind</b> ربط بريد إلكتروني\n"
+        "<b>/unbind</b> فك ربط البريد\n"
+        "<b>/change</b> تغيير البريد\n"
+        "<b>/cancel</b> إلغاء الطلب\n"
+        "<b>/revoke</b> إلغاء التوكن\n"
+        "<b>/platforms</b> المنصات المرتبطة\n"
+        "<b>/status</b> حالة البوت\n\n"
+        "<b>ديــفـلـوبـر: @yacine_X6</b>"
+        "</blockquote>"
+    ).format(username)
+
+def _fmt_info(uid: str, nick: str, region: str, email: str, pending: str, cd: int) -> str:
+    return (
+        "<blockquote>"
+        f"<b>مــعـلـومـات الـلاعـب</b>\n\n"
+        f"<b>UID:</b> {uid}\n"
+        f"<b>Nickname:</b> {nick}\n"
+        f"<b>Region:</b> {region}\n"
+        f"<b>Email:</b> {email or 'None'}\n"
+        f"<b>Pending:</b> {pending or 'None'}\n"
+        f"<b>Countdown:</b> {_sec_to_str(cd) if cd else 'N/A'}"
+        "</blockquote>"
     )
 
-
-def format_collect_success(result):
-    """تنسيق نجاح الجمع"""
-    target_status = "✅ تم الوصول" if result['reached_target'] else "⚠️ لم يكتمل"
+def _fmt_platforms(bound: List[int], available: List[int]) -> str:
+    b = ", ".join([PLATFORMS.get(p, f"Unknown({p})") for p in bound]) or "None"
+    a = ", ".join([PLATFORMS.get(p, f"Unknown({p})") for p in available]) or "None"
     return (
-        f"<b>[+] تـم جـلـب الـنـقـاط</b>\n"
-        f"\n"
-        f"<u><b>النقاط السابقة:</b></u> <b>{result['start_score']}</b>\n"
-        f"<u><b>النقاط الحالية:</b></u> <b>{result['end_score']}</b>\n"
-        f"<u><b>الزيادة:</b></u> <b>+{result['gained']}</b> نقطة\n"
-        f"<u><b>الهدف:</b></u> <b>{result['target']}</b> نقطة\n"
-        f"<u><b>الحالة:</b></u> <b>{target_status}</b>\n"
-        f"<u><b>تم معالجة:</b></u> <b>{result['processed']}</b> طلب\n"
-        f"<u><b>دورات:</b></u> <b>{result['cycles']}</b>\n"
-        f"<u><b>نجاح:</b></u> <b>{result['success_count']}</b>\n"
-        f"<u><b>فشل:</b></u> <b>{result['fail_count']}</b>\n"
-        f"\n"
-        f"<blockquote>Dev by: @yacine_X6 🕸</blockquote>"
+        "<blockquote>"
+        f"<b>الـمـنـصـات الـمـربـوطـة</b>\n\n"
+        f"<b>Bound:</b> {b}\n"
+        f"<b>Available:</b> {a}"
+        "</blockquote>"
     )
 
-
-def format_points(score):
-    """تنسيق النقاط"""
+def _fmt_result(success: bool, title: str, details: str = "") -> str:
+    status = "Success" if success else "Failed"
     return (
-        f"<b>[+] نـقـاطـك الـحـالـيـة</b>\n"
-        f"\n"
-        f"<u><b>النقاط:</b></u> <b>{score}</b>\n"
-        f"\n"
-        f"<blockquote>Dev by: @yacine_X6 🕸</blockquote>"
+        "<blockquote>"
+        f"<b>{title}</b>\n\n"
+        f"<b>Status:</b> {status}\n"
+        f"{details}"
+        "</blockquote>"
+    ).strip()
+
+def _fmt_status() -> str:
+    return (
+        "<blockquote>"
+        f"<b>حــالة الـبـوت</b>\n\n"
+        f"<b>Version:</b> 9.0\n"
+        f"<b>Operations:</b> {len(_operation_log)}\n"
+        f"<b>Active Sessions:</b> {len(_user_sessions)}\n"
+        f"<b>Status:</b> Online"
+        "</blockquote>"
     )
 
+# ====== KEYBOARDS (بدون إيموجي) ======
 
-def format_status(score):
-    """تنسيق الحالة"""
-    status = "🟢 يعمل" if bot_instance.running else "🔴 متوقف"
-    return (
-        f"<b>[+] حـالـة الـبـوت</b>\n"
-        f"\n"
-        f"<u><b>الحالة:</b></u> <b>{status}</b>\n"
-        f"<u><b>النقاط:</b></u> <b>{score}</b>\n"
-        f"<u><b>نجاح:</b></u> <b>{bot_instance.success_count}</b>\n"
-        f"<u><b>فشل:</b></u> <b>{bot_instance.fail_count}</b>\n"
-        f"\n"
-        f"<blockquote>Dev by: @yacine_X6 🕸</blockquote>"
-    )
+def _kb_main() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("Info", callback_data="cmd_info"), InlineKeyboardButton("Bind", callback_data="cmd_bind")],
+        [InlineKeyboardButton("Unbind", callback_data="cmd_unbind"), InlineKeyboardButton("Change", callback_data="cmd_change")],
+        [InlineKeyboardButton("Cancel", callback_data="cmd_cancel"), InlineKeyboardButton("Revoke", callback_data="cmd_revoke")],
+        [InlineKeyboardButton("Platforms", callback_data="cmd_platforms"), InlineKeyboardButton("Status", callback_data="cmd_status")]
+    ])
 
+def _kb_confirm(action: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("Confirm", callback_data=f"confirm_{action}"), InlineKeyboardButton("Cancel", callback_data="cancel")]
+    ])
 
-def format_no_orders(score):
-    """لا توجد طلبات"""
-    return (
-        f"<b>[+] لا تـوجـد طـلـبـات</b>\n"
-        f"\n"
-        f"<u><b>نقاطك الحالية:</b></u> <b>{score}</b>\n"
-        f"\n"
-        f"<blockquote>Dev by: @yacine_X6 🕸</blockquote>"
-    )
+def _kb_unbind() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("OTP", callback_data="unbind_otp"), InlineKeyboardButton("Security Code", callback_data="unbind_sec")],
+        [InlineKeyboardButton("Back", callback_data="back")]
+    ])
 
+def _kb_change() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("OTP", callback_data="change_otp"), InlineKeyboardButton("Security Code", callback_data="change_sec")],
+        [InlineKeyboardButton("Back", callback_data="back")]
+    ])
 
-def format_error(error_msg):
-    """خطأ"""
-    return (
-        f"<b>[+] خـطـأ</b>\n"
-        f"\n"
-        f"<u><b>التفاصيل:</b></u> <b>{error_msg}</b>\n"
-        f"\n"
-        f"<blockquote>Dev by: @yacine_X6 🕸</blockquote>"
-    )
+# ====== COMMAND HANDLERS ======
 
-
-def format_already_running():
-    """البوت يعمل"""
-    return (
-        f"<b>[+] الـبـوت يـعـمل</b>\n"
-        f"\n"
-        f"<u><b>الحالة:</b></u> <b>يعمل حالياً، انتظر حتى ينتهي</b>\n"
-        f"\n"
-        f"<blockquote>Dev by: @yacine_X6 🕸</blockquote>"
-    )
-
-
-# ====== handlers ======
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
-    username = user.username or user.first_name or "مستخدم"
-    text = format_start_message(username)
-    await update.message.reply_text(text, parse_mode="HTML")
+    await update.message.reply_text(_fmt_start(user.username or user.first_name or "User"), parse_mode="HTML", reply_markup=_kb_main())
 
+async def cmd_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    uid = update.effective_user.id
+    if uid not in _user_sessions or "token" not in _user_sessions[uid]:
+        await update.message.reply_text("<blockquote><b>لـم يـتـم تـسـجـيـل الـدخـول</b>\n\n<b>اسـتـخـدم /bind أو أي أمـر آخـر لإدخـال الـتـوكـن</b></blockquote>", parse_mode="HTML")
+        return
+    t = _user_sessions[uid]["token"]
+    msg = await update.message.reply_text("<blockquote><b>جـاري جـلـب الـمـعـلـومـات...</b></blockquote>", parse_mode="HTML")
+    uid2, nick, region = _gapi.player(t)
+    bd = _gapi.bind_info(t)
+    if uid2 is None:
+        await msg.edit_text("<blockquote><b>فـشـل الـتـصـديـق</b>\n\n<b>الـتـوكـن غـيـر صـالـح أو مـنـتـهي</b></blockquote>", parse_mode="HTML")
+        _log_op(uid, "info", "failed", "invalid token")
+        return
+    e, p, c = (bd.get("email", "") if bd else ""), (bd.get("email_to_be", "") if bd else ""), (bd.get("request_exec_countdown", 0) if bd else 0)
+    await msg.edit_text(_fmt_info(uid2, nick, region, e, p, c), parse_mode="HTML")
+    _log_op(uid, "info", "success", f"uid={uid2}")
 
-async def points(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    msg = await update.message.reply_text("⏳ جاري جلب النقاط...")
-    score = bot_instance.fetch_score()
-    if score is not None:
-        text = format_points(score)
-        await msg.edit_text(text, parse_mode="HTML")
+# ====== BIND CONVERSATION ======
+
+async def conv_bind_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    q = update.callback_query
+    if q:
+        await q.answer()
+        await q.edit_message_text("<blockquote><b>ربــط بـريـد إلـكـتـرونـي</b>\n\n<b>أرسـل الـتـوكـن الـخـاص بـك:</b></blockquote>", parse_mode="HTML")
     else:
-        text = format_error("فشل جلب النقاط")
-        await msg.edit_text(text, parse_mode="HTML")
+        await update.message.reply_text("<blockquote><b>ربــط بـريـد إلـكـتـرونـي</b>\n\n<b>أرسـل الـتـوكـن الـخـاص بـك:</b></blockquote>", parse_mode="HTML")
+    return STATE_BIND_EMAIL
 
+async def conv_bind_token(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    uid = update.effective_user.id
+    t = update.message.text.strip()
+    uid2, nick, region = _gapi.player(t)
+    if uid2 is None:
+        await update.message.reply_text("<blockquote><b>تـوكـن غـيـر صـالـح</b>\n\n<b>الـرجـاء إعـادة الـمـحـاولـة</b></blockquote>", parse_mode="HTML")
+        return ConversationHandler.END
+    _user_sessions[uid] = {"token": t, "uid": uid2, "nick": nick}
+    await update.message.reply_text(f"<blockquote><b>تـم الـتـصـديـق</b>\n\n<b>UID:</b> {uid2}\n<b>Nick:</b> {nick}\n<b>Region:</b> {region}\n\n<b>أرسـل الـبـريـد الإلـكـتـرونـي للـربـط:</b></blockquote>", parse_mode="HTML")
+    return STATE_BIND_OTP
 
-async def collect(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    if user_id != ADMIN_ID:
-        text = (
-            f"<b>[+] هـذا الأمـر للـمـطـور فـقـط</b>\n"
-            f"\n"
-            f"<blockquote>Dev by: @yacine_X6 🕸</blockquote>"
-        )
-        await update.message.reply_text(text, parse_mode="HTML")
-        return
+async def conv_bind_email(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    uid = update.effective_user.id
+    e = update.message.text.strip()
+    if uid not in _user_sessions:
+        await update.message.reply_text("<blockquote><b>انـتـهـت الـجـلـسـة</b>\n\n<b>ابـدأ مـن جـديـد بـ /bind</b></blockquote>", parse_mode="HTML")
+        return ConversationHandler.END
+    _user_sessions[uid]["email"] = e
+    t = _user_sessions[uid]["token"]
+    msg = await update.message.reply_text("<blockquote><b>جـاري إرسـال OTP...</b></blockquote>", parse_mode="HTML")
+    r = _gapi.send_otp(e, t)
+    d = r.json() if r.status_code == 200 else {}
+    if d.get("result") == 0:
+        await msg.edit_text(f"<blockquote><b>تـم إرسـال OTP</b>\n\n<b>الـبـريـد:</b> {e}\n\n<b>أرسـل رقـم OTP:</b></blockquote>", parse_mode="HTML")
+        return STATE_BIND_SEC
+    else:
+        await msg.edit_text(f"<blockquote><b>فـشـل إرسـال OTP</b>\n\n<b>الـخطـأ:</b> {d.get('error', 'Unknown')}</blockquote>", parse_mode="HTML")
+        return ConversationHandler.END
 
-    if bot_instance.running:
-        text = format_already_running()
-        await update.message.reply_text(text, parse_mode="HTML")
-        return
+async def conv_bind_otp(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    uid = update.effective_user.id
+    o = update.message.text.strip()
+    if uid not in _user_sessions:
+        await update.message.reply_text("<blockquote><b>انـتـهـت الـجـلـسـة</b>\n\n<b>ابـدأ مـن جـديـد بـ /bind</b></blockquote>", parse_mode="HTML")
+        return ConversationHandler.END
+    e = _user_sessions[uid].get("email", "")
+    t = _user_sessions[uid]["token"]
+    msg = await update.message.reply_text("<blockquote><b>جـاري الـتـحـقـق مـن OTP...</b></blockquote>", parse_mode="HTML")
+    v = _gapi.verify_otp(e, o, t)
+    if not v:
+        await msg.edit_text("<blockquote><b>OTP غـيـر صـالـح</b>\n\n<b>الـرجـاء إعـادة الـمـحـاولـة</b></blockquote>", parse_mode="HTML")
+        return ConversationHandler.END
+    _user_sessions[uid]["verifier"] = v
+    await msg.edit_text(f"<blockquote><b>تـم الـتـحـقـق مـن OTP</b>\n\n<b>الـبـريـد:</b> {e}\n\n<b>أدخـل كـود الأمـان (6 أرقـام):</b></blockquote>", parse_mode="HTML")
+    return STATE_BIND_SEC
 
-    try:
-        parts = update.message.text.split()
-        if len(parts) > 1:
-            target = int(parts[1])
-            if target < 100:
-                target = 100
-            if target > 10000:
-                target = 10000
+async def conv_bind_sec(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    uid = update.effective_user.id
+    s = update.message.text.strip()
+    if len(s) != 6 or not s.isdigit():
+        await update.message.reply_text("<blockquote><b>كـود غـيـر صـالـح</b>\n\n<b>يـجـب أن يـكـون 6 أرقـام</b></blockquote>", parse_mode="HTML")
+        return STATE_BIND_SEC
+    if uid not in _user_sessions:
+        await update.message.reply_text("<blockquote><b>انـتـهـت الـجـلـسـة</b>\n\n<b>ابـدأ مـن جـديـد بـ /bind</b></blockquote>", parse_mode="HTML")
+        return ConversationHandler.END
+    e = _user_sessions[uid].get("email", "")
+    t = _user_sessions[uid]["token"]
+    v = _user_sessions[uid].get("verifier", "")
+    msg = await update.message.reply_text("<blockquote><b>جـاري إنـشـاء طـلـب الـربـط...</b></blockquote>", parse_mode="HTML")
+    r = _gapi.create_bind(e, t, v, s)
+    d = r.json() if r.status_code == 200 else {}
+    if d.get("result") == 0:
+        await msg.edit_text(f"<blockquote><b>تـم ربـط الـبـريـد</b>\n\n<b>الـبـريـد:</b> {e}\n<b>الـحـالـة:</b> Success</blockquote>", parse_mode="HTML")
+        _log_op(uid, "bind", "success", f"email={e}")
+    else:
+        await msg.edit_text(f"<blockquote><b>فـشـل ربـط الـبـريـد</b>\n\n<b>الـخطـأ:</b> {d.get('error', 'Unknown')}</blockquote>", parse_mode="HTML")
+        _log_op(uid, "bind", "failed", d.get("error", ""))
+    return ConversationHandler.END
+
+# ====== UNBIND CONVERSATION ======
+
+async def conv_unbind_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    q = update.callback_query
+    if q:
+        await q.answer()
+        await q.edit_message_text("<blockquote><b>فــك ربــط الـبـريـد</b>\n\n<b>اخـتـر طـريـقـة الـتـحـقـق:</b></blockquote>", parse_mode="HTML", reply_markup=_kb_unbind())
+    else:
+        await update.message.reply_text("<blockquote><b>فــك ربــط الـبـريـد</b>\n\n<b>أرسـل الـتـوكـن الـخـاص بـك:</b></blockquote>", parse_mode="HTML")
+    return STATE_UNBIND_CHOICE
+
+async def conv_unbind_token(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    uid = update.effective_user.id
+    t = update.message.text.strip()
+    uid2, nick, region = _gapi.player(t)
+    if uid2 is None:
+        await update.message.reply_text("<blockquote><b>تـوكـن غـيـر صـالـح</b>\n\n<b>الـرجـاء إعـادة الـمـحـاولـة</b></blockquote>", parse_mode="HTML")
+        return ConversationHandler.END
+    _user_sessions[uid] = {"token": t, "uid": uid2, "nick": nick}
+    await update.message.reply_text(f"<blockquote><b>تـم الـتـصـديـق</b>\n\n<b>UID:</b> {uid2}\n<b>Nick:</b> {nick}\n\n<b>اخـتـر طـريـقـة الـتـحـقـق:</b></blockquote>", parse_mode="HTML", reply_markup=_kb_unbind())
+    return STATE_UNBIND_OTP
+
+async def conv_unbind_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    q = update.callback_query
+    await q.answer()
+    uid = q.from_user.id
+    if uid not in _user_sessions:
+        await q.edit_message_text("<blockquote><b>انـتـهـت الـجـلـسـة</b>\n\n<b>ابـدأ مـن جـديـد بـ /unbind</b></blockquote>", parse_mode="HTML")
+        return ConversationHandler.END
+    choice = q.data
+    t = _user_sessions[uid]["token"]
+    bd = _gapi.bind_info(t)
+    e = bd.get("email", "") if bd else ""
+    if not e:
+        await q.edit_message_text("<blockquote><b>لا يـوجـد بـريـد مـربـوط</b>\n\n<b>الـحـسـاب لـيـس لـديـه بـريـد إلـكـتـرونـي مـربـوط</b></blockquote>", parse_mode="HTML")
+        return ConversationHandler.END
+    _user_sessions[uid]["email"] = e
+    if choice == "unbind_otp":
+        msg = await q.edit_message_text("<blockquote><b>جـاري إرسـال OTP...</b></blockquote>", parse_mode="HTML")
+        r = _gapi.send_otp(e, t)
+        d = r.json() if r.status_code == 200 else {}
+        if d.get("result") == 0:
+            await msg.edit_text(f"<blockquote><b>تـم إرسـال OTP</b>\n\n<b>الـبـريـد:</b> {e}\n\n<b>أرسـل رقـم OTP:</b></blockquote>", parse_mode="HTML")
+            return STATE_UNBIND_OTP
         else:
-            target = 1000
-    except:
-        target = 1000
+            await msg.edit_text(f"<blockquote><b>فـشـل إرسـال OTP</b>\n\n<b>الـخطـأ:</b> {d.get('error', 'Unknown')}</blockquote>", parse_mode="HTML")
+            return ConversationHandler.END
+    elif choice == "unbind_sec":
+        await q.edit_message_text(f"<blockquote><b>أدخـل كـود الأمـان</b>\n\n<b>الـبـريـد:</b> {e}\n\n<b>أدخـل كـود الأمـان (6 أرقـام):</b></blockquote>", parse_mode="HTML")
+        return STATE_UNBIND_SEC
+    return ConversationHandler.END
 
-    msg = await update.message.reply_text(
-        f"<b>[+] جـاري الـعـمـل</b>\n\n"
-        f"<u><b>الهدف:</b></u> <b>{target}</b> نقطة\n"
-        f"<u><b>الحالة:</b></u> <b>جاري المعالجة...</b>\n\n"
-        f"<blockquote>Dev by: @yacine_X6 🕸</blockquote>",
-        parse_mode="HTML"
-    )
-
-    result = bot_instance.run_until_target(target_score=target, max_cycles=50)
-
-    if result["status"] == "success":
-        text = format_collect_success(result)
-    elif result["status"] == "no_orders":
-        text = format_no_orders(result.get('score', 0))
-    elif result["status"] == "already_running":
-        text = format_already_running()
+async def conv_unbind_otp(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    uid = update.effective_user.id
+    o = update.message.text.strip()
+    if uid not in _user_sessions:
+        await update.message.reply_text("<blockquote><b>انـتـهـت الـجـلـسـة</b>\n\n<b>ابـدأ مـن جـديـد بـ /unbind</b></blockquote>", parse_mode="HTML")
+        return ConversationHandler.END
+    e = _user_sessions[uid].get("email", "")
+    t = _user_sessions[uid]["token"]
+    msg = await update.message.reply_text("<blockquote><b>جـاري الـتـحـقـق...</b></blockquote>", parse_mode="HTML")
+    i = _gapi.verify_identity(e, t, otp=o)
+    if not i:
+        await msg.edit_text("<blockquote><b>OTP غـيـر صـالـح</b>\n\n<b>الـرجـاء إعـادة الـمـحـاولـة</b></blockquote>", parse_mode="HTML")
+        return ConversationHandler.END
+    await msg.edit_text("<blockquote><b>جـاري فـك الـربـط...</b></blockquote>", parse_mode="HTML")
+    r = _gapi.create_unbind(t, i)
+    d = r.json() if r.status_code == 200 else {}
+    if d.get("result") == 0:
+        await msg.edit_text(f"<blockquote><b>تـم فـك ربـط الـبـريـد</b>\n\n<b>الـبـريـد:</b> {e}\n<b>الـحـالـة:</b> Success</blockquote>", parse_mode="HTML")
+        _log_op(uid, "unbind", "success", f"email={e}")
     else:
-        text = format_error(result.get('error', 'غير معروف'))
+        await msg.edit_text(f"<blockquote><b>فـشـل فـك ربـط الـبـريـد</b>\n\n<b>الـخطـأ:</b> {d.get('error', 'Unknown')}</blockquote>", parse_mode="HTML")
+        _log_op(uid, "unbind", "failed", d.get("error", ""))
+    return ConversationHandler.END
 
-    await msg.edit_text(text, parse_mode="HTML")
+async def conv_unbind_sec(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    uid = update.effective_user.id
+    s = update.message.text.strip()
+    if uid not in _user_sessions:
+        await update.message.reply_text("<blockquote><b>انـتـهـت الـجـلـسـة</b>\n\n<b>ابـدأ مـن جـديـد بـ /unbind</b></blockquote>", parse_mode="HTML")
+        return ConversationHandler.END
+    e = _user_sessions[uid].get("email", "")
+    t = _user_sessions[uid]["token"]
+    msg = await update.message.reply_text("<blockquote><b>جـاري الـتـحـقـق...</b></blockquote>", parse_mode="HTML")
+    i = _gapi.verify_identity(e, t, sec=s)
+    if not i:
+        await msg.edit_text("<blockquote><b>كـود الأمـان غـيـر صـالـح</b>\n\n<b>الـرجـاء إعـادة الـمـحـاولـة</b></blockquote>", parse_mode="HTML")
+        return ConversationHandler.END
+    await msg.edit_text("<blockquote><b>جـاري فـك الـربـط...</b></blockquote>", parse_mode="HTML")
+    r = _gapi.create_unbind(t, i)
+    d = r.json() if r.status_code == 200 else {}
+    if d.get("result") == 0:
+        await msg.edit_text(f"<blockquote><b>تـم فـك ربـط الـبـريـد</b>\n\n<b>الـبـريـد:</b> {e}\n<b>الـحـالـة:</b> Success</blockquote>", parse_mode="HTML")
+        _log_op(uid, "unbind", "success", f"email={e}")
+    else:
+        await msg.edit_text(f"<blockquote><b>فـشـل فـك ربـط الـبـريـد</b>\n\n<b>الـخطـأ:</b> {d.get('error', 'Unknown')}</blockquote>", parse_mode="HTML")
+        _log_op(uid, "unbind", "failed", d.get("error", ""))
+    return ConversationHandler.END
 
+# ====== CHANGE CONVERSATION ======
 
-async def status_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    score = bot_instance.fetch_score()
-    text = format_status(score)
-    await update.message.reply_text(text, parse_mode="HTML")
+async def conv_change_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    q = update.callback_query
+    if q:
+        await q.answer()
+        await q.edit_message_text("<blockquote><b>تــغـيـيـر الـبـريـد</b>\n\n<b>أرسـل الـتـوكـن الـخـاص بـك:</b></blockquote>", parse_mode="HTML")
+    else:
+        await update.message.reply_text("<blockquote><b>تــغـيـيـر الـبـريـد</b>\n\n<b>أرسـل الـتـوكـن الـخـاص بـك:</b></blockquote>", parse_mode="HTML")
+    return STATE_CHANGE_CHOICE
 
+async def conv_change_token(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    uid = update.effective_user.id
+    t = update.message.text.strip()
+    uid2, nick, region = _gapi.player(t)
+    if uid2 is None:
+        await update.message.reply_text("<blockquote><b>تـوكـن غـيـر صـالـح</b>\n\n<b>الـرجـاء إعـادة الـمـحـاولـة</b></blockquote>", parse_mode="HTML")
+        return ConversationHandler.END
+    _user_sessions[uid] = {"token": t, "uid": uid2, "nick": nick}
+    await update.message.reply_text(f"<blockquote><b>تـم الـتـصـديـق</b>\n\n<b>UID:</b> {uid2}\n<b>Nick:</b> {nick}\n\n<b>اخـتـر طـريـقـة الـتـحـقـق:</b></blockquote>", parse_mode="HTML", reply_markup=_kb_change())
+    return STATE_CHANGE_OLD_OTP
 
-# ====== main ======
+async def conv_change_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    q = update.callback_query
+    await q.answer()
+    uid = q.from_user.id
+    if uid not in _user_sessions:
+        await q.edit_message_text("<blockquote><b>انـتـهـت الـجـلـسـة</b>\n\n<b>ابـدأ مـن جـديـد بـ /change</b></blockquote>", parse_mode="HTML")
+        return ConversationHandler.END
+    choice = q.data
+    t = _user_sessions[uid]["token"]
+    bd = _gapi.bind_info(t)
+    e = bd.get("email", "") if bd else ""
+    if not e:
+        await q.edit_message_text("<blockquote><b>لا يـوجـد بـريـد مـربـوط</b>\n\n<b>الـحـسـاب لـيـس لـديـه بـريـد إلـكـتـرونـي مـربـوط</b></blockquote>", parse_mode="HTML")
+        return ConversationHandler.END
+    _user_sessions[uid]["old_email"] = e
+    if choice == "change_otp":
+        msg = await q.edit_message_text("<blockquote><b>جـاري إرسـال OTP...</b></blockquote>", parse_mode="HTML")
+        r = _gapi.send_otp(e, t)
+        d = r.json() if r.status_code == 200 else {}
+        if d.get("result") == 0:
+            await msg.edit_text(f"<blockquote><b>تـم إرسـال OTP</b>\n\n<b>الـبـريـد الـقـديـم:</b> {e}\n\n<b>أرسـل رقـم OTP:</b></blockquote>", parse_mode="HTML")
+            return STATE_CHANGE_OLD_OTP
+        else:
+            await msg.edit_text(f"<blockquote><b>فـشـل إرسـال OTP</b>\n\n<b>الـخطـأ:</b> {d.get('error', 'Unknown')}</blockquote>", parse_mode="HTML")
+            return ConversationHandler.END
+    elif choice == "change_sec":
+        await q.edit_message_text(f"<blockquote><b>أدخـل كـود الأمـان</b>\n\n<b>الـبـريـد الـقـديـم:</b> {e}\n\n<b>أدخـل كـود الأمـان (6 أرقـام):</b></blockquote>", parse_mode="HTML")
+        return STATE_CHANGE_OLD_SEC
+    return ConversationHandler.END
+
+async def conv_change_old_otp(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    uid = update.effective_user.id
+    o = update.message.text.strip()
+    if uid not in _user_sessions:
+        await update.message.reply_text("<blockquote><b>انـتـهـت الـجـلـسـة</b>\n\n<b>ابـدأ مـن جـديـد بـ /change</b></blockquote>", parse_mode="HTML")
+        return ConversationHandler.END
+    e = _user_sessions[uid].get("old_email", "")
+    t = _user_sessions[uid]["token"]
+    msg = await update.message.reply_text("<blockquote><b>جـاري الـتـحـقـق...</b></blockquote>", parse_mode="HTML")
+    i = _gapi.verify_identity(e, t, otp=o)
+    if not i:
+        await msg.edit_text("<blockquote><b>OTP غـيـر صـالـح</b>\n\n<b>الـرجـاء إعـادة الـمـحـاولـة</b></blockquote>", parse_mode="HTML")
+        return ConversationHandler.END
+    _user_sessions[uid]["identity"] = i
+    await msg.edit_text(f"<blockquote><b>تـم الـتـحـقـق</b>\n\n<b>أرسـل الـبـريـد الإلـكـتـرونـي الـجـديـد:</b></blockquote>", parse_mode="HTML")
+    return STATE_CHANGE_NEW_EMAIL
+
+async def conv_change_new_email(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    uid = update.effective_user.id
+    ne = update.message.text.strip()
+    if uid not in _user_sessions:
+        await update.message.reply_text("<blockquote><b>انـتـهـت الـجـلـسـة</b>\n\n<b>ابـدأ مـن جـديـد بـ /change</b></blockquote>", parse_mode="HTML")
+        return ConversationHandler.END
+    _user_sessions[uid]["email"] = ne
+    t = _user_sessions[uid]["token"]
+    msg = await update.message.reply_text("<blockquote><b>جـاري إرسـال OTP إلـى الـبـريـد الـجـديـد...</b></blockquote>", parse_mode="HTML")
+    r = _gapi.send_otp(ne, t)
+    d = r.json() if r.status_code == 200 else {}
+    if d.get("result") == 0:
+        await msg.edit_text(f"<blockquote><b>تـم إرسـال OTP</b>\n\n<b>الـبـريـد الـجـديـد:</b> {ne}\n\n<b>أرسـل رقـم OTP:</b></blockquote>", parse_mode="HTML")
+        return STATE_CHANGE_NEW_OTP
+    else:
+        await msg.edit_text(f"<blockquote><b>فـشـل إرسـال OTP</b>\n\n<b>الـخطـأ:</b> {d.get('error', 'Unknown')}</blockquote>", parse_mode="HTML")
+        return ConversationHandler.END
+
+async def conv_change_new_otp(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    uid = update.effective_user.id
+    o = update.message.text.strip()
+    if uid not in _user_sessions:
+        await update.message.reply_text("<blockquote><b>انـتـهـت الـجـلـسـة</b>\n\n<b>ابـدأ مـن جـديـد بـ /change</b></blockquote>", parse_mode="HTML")
+        return ConversationHandler.END
+    ne = _user_sessions[uid].get("email", "")
+    t = _user_sessions[uid]["token"]
+    msg = await update.message.reply_text("<blockquote><b>جـاري الـتـحـقـق مـن OTP...</b></blockquote>", parse_mode="HTML")
+    v = _gapi.verify_otp(ne, o, t)
+    if not v:
+        await msg.edit_text("<blockquote><b>OTP غـيـر صـالـح</b>\n\n<b>الـرجـاء إعـادة الـمـحـاولـة</b></blockquote>", parse_mode="HTML")
+        return ConversationHandler.END
+    i = _user_sessions[uid].get("identity", "")
+    await msg.edit_text("<blockquote><b>جـاري تـغـيـيـر الـبـريـد...</b></blockquote>", parse_mode="HTML")
+    r = _gapi.create_rebind(i, ne, t, v)
+    d = r.json() if r.status_code == 200 else {}
+    if d.get("result") == 0:
+        await msg.edit_text(f"<blockquote><b>تـم تـغـيـيـر الـبـريـد</b>\n\n<b>الـبـريـد الـجـديـد:</b> {ne}\n<b>الـحـالـة:</b> Success</blockquote>", parse_mode="HTML")
+        _log_op(uid, "change", "success", f"new_email={ne}")
+    else:
+        await msg.edit_text(f"<blockquote><b>فـشـل تـغـيـيـر الـبـريـد</b>\n\n<b>الـخطـأ:</b> {d.get('error', 'Unknown')}</blockquote>", parse_mode="HTML")
+        _log_op(uid, "change", "failed", d.get("error", ""))
+    return ConversationHandler.END
+
+# ====== OTHER COMMANDS ======
+
+async def cmd_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    uid = update.effective_user.id
+    if uid not in _user_sessions:
+        await update.message.reply_text("<blockquote><b>لا تـوجـد جـلـسـة نـشـطـة</b></blockquote>", parse_mode="HTML")
+        return
+    t = _user_sessions[uid].get("token", "")
+    if not t:
+        await update.message.reply_text("<blockquote><b>لا تـوجـد طـلـبـات</b></blockquote>", parse_mode="HTML")
+        return
+    msg = await update.message.reply_text("<blockquote><b>جـاري إلـغـاء الـطـلـب...</b></blockquote>", parse_mode="HTML")
+    r = _gapi.cancel(t)
+    d = r.json() if r.status_code == 200 else {}
+    if d.get("result") == 0:
+        await msg.edit_text("<blockquote><b>تـم إلـغـاء الـطـلـب</b>\n\n<b>الـحـالـة:</b> Success</blockquote>", parse_mode="HTML")
+        _log_op(uid, "cancel", "success", "")
+    else:
+        await msg.edit_text(f"<blockquote><b>فـشـل إلـغـاء الـطـلـب</b>\n\n<b>الـخطـأ:</b> {d.get('error', 'Unknown')}</blockquote>", parse_mode="HTML")
+        _log_op(uid, "cancel", "failed", d.get("error", ""))
+
+async def cmd_revoke_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    uid = update.effective_user.id
+    if uid not in _user_sessions or "token" not in _user_sessions[uid]:
+        await update.message.reply_text("<blockquote><b>لـم يـتـم تـسـجـيـل الـدخـول</b>\n\n<b>اسـتـخـدم /bind أو أي أمـر آخـر لإدخـال الـتـوكـن</b></blockquote>", parse_mode="HTML")
+        return
+    t = _user_sessions[uid]["token"]
+    uid2, nick, region = _gapi.player(t)
+    if uid2 is None:
+        await update.message.reply_text("<blockquote><b>تـوكـن غـيـر صـالـح</b></blockquote>", parse_mode="HTML")
+        return
+    await update.message.reply_text(f"<blockquote><b>تـأكـيـد إلـغـاء الـتـوكـن</b>\n\n<b>UID:</b> {uid2}\n<b>Nick:</b> {nick}\n\n<b>هـل أنـت مـتـأكـد؟</b></blockquote>", parse_mode="HTML", reply_markup=_kb_confirm("revoke"))
+
+async def cmd_revoke_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    q = update.callback_query
+    await q.answer()
+    uid = q.from_user.id
+    if uid not in _user_sessions:
+        await q.edit_message_text("<blockquote><b>انـتـهـت الـجـلـسـة</b></blockquote>", parse_mode="HTML")
+        return
+    t = _user_sessions[uid].get("token", "")
+    if q.data == "confirm_revoke":
+        msg = await q.edit_message_text("<blockquote><b>جـاري إلـغـاء الـتـوكـن...</b></blockquote>", parse_mode="HTML")
+        r = _gapi.revoke(t)
+        if r.status_code == 200 and "error" not in r.text:
+            await msg.edit_text("<blockquote><b>تـم إلـغـاء الـتـوكـن</b>\n\n<b>الـحـالـة:</b> Success</blockquote>", parse_mode="HTML")
+            _log_op(uid, "revoke", "success", "")
+            _user_sessions.pop(uid, None)
+        else:
+            await msg.edit_text(f"<blockquote><b>فـشـل إلـغـاء الـتـوكـن</b>\n\n<b>الـخطـأ:</b> {r.status_code}</blockquote>", parse_mode="HTML")
+            _log_op(uid, "revoke", "failed", str(r.status_code))
+    else:
+        await q.edit_message_text("<blockquote><b>تـم الإلـغـاء</b></blockquote>", parse_mode="HTML")
+
+async def cmd_platforms(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    uid = update.effective_user.id
+    if uid not in _user_sessions or "token" not in _user_sessions[uid]:
+        await update.message.reply_text("<blockquote><b>لـم يـتـم تـسـجـيـل الـدخـول</b>\n\n<b>اسـتـخـدم /bind أو أي أمـر آخـر لإدخـال الـتـوكـن</b></blockquote>", parse_mode="HTML")
+        return
+    t = _user_sessions[uid]["token"]
+    msg = await update.message.reply_text("<blockquote><b>جـاري جـلـب الـمـنـصـات...</b></blockquote>", parse_mode="HTML")
+    d = _gapi.platforms(t)
+    if d is None:
+        await msg.edit_text("<blockquote><b>فـشـل جـلـب الـمـنـصـات</b></blockquote>", parse_mode="HTML")
+        return
+    await msg.edit_text(_fmt_platforms(d.get("bounded_accounts", []), d.get("available_platforms", [])), parse_mode="HTML")
+    _log_op(uid, "platforms", "success", f"bound={len(d.get('bounded_accounts', []))}")
+
+async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(_fmt_status(), parse_mode="HTML")
+
+async def _cb_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    q = update.callback_query
+    await q.answer()
+    d = q.data
+    if d == "back":
+        await q.edit_message_text(_fmt_start(q.from_user.username or "User"), parse_mode="HTML", reply_markup=_kb_main())
+        return
+    if d == "cancel":
+        await q.edit_message_text("<blockquote><b>تـم الإلـغـاء</b></blockquote>", parse_mode="HTML", reply_markup=_kb_main())
+        return
+    cmd_map = {
+        "cmd_info": cmd_info,
+        "cmd_bind": conv_bind_start,
+        "cmd_unbind": conv_unbind_start,
+        "cmd_change": conv_change_start,
+        "cmd_cancel": cmd_cancel,
+        "cmd_revoke": cmd_revoke_start,
+        "cmd_platforms": cmd_platforms,
+        "cmd_status": cmd_status
+    }
+    if d in cmd_map:
+        await cmd_map[d](update, context)
+
 def main():
     app = Application.builder().token(TOKEN).build()
-
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("points", points))
-    app.add_handler(CommandHandler("collect", collect))
-    app.add_handler(CommandHandler("status", status_cmd))
-
-    print("🕸 TikSpark Bot v7.2 Started")
-    print("👑 Dev: @yacine_X6")
+    app.add_handler(CommandHandler("start", cmd_start))
+    app.add_handler(CommandHandler("info", cmd_info))
+    app.add_handler(CommandHandler("cancel", cmd_cancel))
+    app.add_handler(CommandHandler("revoke", cmd_revoke_start))
+    app.add_handler(CommandHandler("platforms", cmd_platforms))
+    app.add_handler(CommandHandler("status", cmd_status))
+    app.add_handler(CallbackQueryHandler(_cb_handler, pattern="^(cmd_|confirm_|unbind_|change_|back|cancel)"))
+    app.add_handler(CallbackQueryHandler(cmd_revoke_confirm, pattern="^confirm_revoke$"))
+    
+    app.add_handler(ConversationHandler(
+        entry_points=[CommandHandler("bind", conv_bind_start), CallbackQueryHandler(conv_bind_start, pattern="^cmd_bind$")],
+        states={
+            STATE_BIND_EMAIL: [MessageHandler(filters.TEXT & ~filters.COMMAND, conv_bind_token)],
+            STATE_BIND_OTP: [MessageHandler(filters.TEXT & ~filters.COMMAND, conv_bind_email)],
+            STATE_BIND_SEC: [MessageHandler(filters.TEXT & ~filters.COMMAND, conv_bind_otp)]
+        },
+        fallbacks=[CommandHandler("cancel", cmd_cancel), CallbackQueryHandler(lambda u, c: ConversationHandler.END, pattern="^cancel$")]
+    ))
+    
+    app.add_handler(ConversationHandler(
+        entry_points=[CommandHandler("unbind", conv_unbind_start), CallbackQueryHandler(conv_unbind_start, pattern="^cmd_unbind$")],
+        states={
+            STATE_UNBIND_CHOICE: [MessageHandler(filters.TEXT & ~filters.COMMAND, conv_unbind_token)],
+            STATE_UNBIND_OTP: [MessageHandler(filters.TEXT & ~filters.COMMAND, conv_unbind_otp)],
+            STATE_UNBIND_SEC: [MessageHandler(filters.TEXT & ~filters.COMMAND, conv_unbind_sec)]
+        },
+        fallbacks=[CommandHandler("cancel", cmd_cancel), CallbackQueryHandler(lambda u, c: ConversationHandler.END, pattern="^cancel$")]
+    ))
+    
+    app.add_handler(ConversationHandler(
+        entry_points=[CommandHandler("change", conv_change_start), CallbackQueryHandler(conv_change_start, pattern="^cmd_change$")],
+        states={
+            STATE_CHANGE_CHOICE: [MessageHandler(filters.TEXT & ~filters.COMMAND, conv_change_token)],
+            STATE_CHANGE_OLD_OTP: [MessageHandler(filters.TEXT & ~filters.COMMAND, conv_change_old_otp)],
+            STATE_CHANGE_OLD_SEC: [MessageHandler(filters.TEXT & ~filters.COMMAND, conv_change_old_otp)],
+            STATE_CHANGE_NEW_EMAIL: [MessageHandler(filters.TEXT & ~filters.COMMAND, conv_change_new_email)],
+            STATE_CHANGE_NEW_OTP: [MessageHandler(filters.TEXT & ~filters.COMMAND, conv_change_new_otp)]
+        },
+        fallbacks=[CommandHandler("cancel", cmd_cancel), CallbackQueryHandler(lambda u, c: ConversationHandler.END, pattern="^cancel$")]
+    ))
+    
+    app.add_handler(CallbackQueryHandler(conv_unbind_choice, pattern="^(unbind_otp|unbind_sec)$"))
+    app.add_handler(CallbackQueryHandler(conv_change_choice, pattern="^(change_otp|change_sec)$"))
+    
+    print("\n" + "="*50)
+    print("GARENA MANAGER BOT v9.0")
+    print("Developer: @yacine_X6")
+    print("Channel: @UESM_Team")
+    print("="*50 + "\n")
     app.run_polling()
-
 
 if __name__ == "__main__":
     main()

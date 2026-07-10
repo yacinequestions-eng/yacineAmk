@@ -20,6 +20,7 @@ import requests
 import urllib3
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ConversationHandler, MessageHandler, ContextTypes, filters
+from telegram.request import HTTPXRequest
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
@@ -27,6 +28,13 @@ logger = logging.getLogger(__name__)
 
 TOKEN = "8422372449:AAGZxNXJzli5pQvCJeh_rygqhAhn9dtwoPM"
 ADMIN_ID = 6936293942
+
+request = HTTPXRequest(
+    connect_timeout=30.0,
+    read_timeout=30.0,
+    write_timeout=30.0,
+    pool_timeout=30.0,
+)
 
 GA_HEADERS = {"User-Agent": "GarenaMSDK/4.0.30", "Content-Type": "application/x-www-form-urlencoded", "Accept": "application/json"}
 GA_BASE = "https://100067.connect.garena.com"
@@ -146,31 +154,52 @@ def _fmt_status() -> str:
         "</blockquote>"
     )
 
-# ====== KEYBOARDS ======
+# ====== KEYBOARDS (أزرار ملونة + Bold) ======
 
 def _kb_main() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("Info", callback_data="cmd_info"), InlineKeyboardButton("Bind", callback_data="cmd_bind")],
-        [InlineKeyboardButton("Unbind", callback_data="cmd_unbind"), InlineKeyboardButton("Change", callback_data="cmd_change")],
-        [InlineKeyboardButton("Cancel", callback_data="cmd_cancel"), InlineKeyboardButton("Revoke", callback_data="cmd_revoke")],
-        [InlineKeyboardButton("Platforms", callback_data="cmd_platforms"), InlineKeyboardButton("Status", callback_data="cmd_status")]
+        [
+            InlineKeyboardButton("🔵 Info", callback_data="cmd_info"),
+            InlineKeyboardButton("🟢 Bind", callback_data="cmd_bind"),
+        ],
+        [
+            InlineKeyboardButton("🟡 Unbind", callback_data="cmd_unbind"),
+            InlineKeyboardButton("🟠 Change", callback_data="cmd_change"),
+        ],
+        [
+            InlineKeyboardButton("🔴 Revoke", callback_data="cmd_revoke"),
+            InlineKeyboardButton("⚪ Cancel", callback_data="cmd_cancel"),
+        ],
+        [
+            InlineKeyboardButton("🟣 Platforms", callback_data="cmd_platforms"),
+            InlineKeyboardButton("🔵 Status", callback_data="cmd_status"),
+        ],
     ])
 
 def _kb_confirm(action: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("Confirm", callback_data=f"confirm_{action}"), InlineKeyboardButton("Cancel", callback_data="cancel")]
+        [
+            InlineKeyboardButton("✅ Confirm", callback_data=f"confirm_{action}"),
+            InlineKeyboardButton("❌ Cancel", callback_data="cancel"),
+        ],
     ])
 
 def _kb_unbind() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("OTP", callback_data="unbind_otp"), InlineKeyboardButton("Security Code", callback_data="unbind_sec")],
-        [InlineKeyboardButton("Back", callback_data="back")]
+        [
+            InlineKeyboardButton("📧 OTP", callback_data="unbind_otp"),
+            InlineKeyboardButton("🔐 Security Code", callback_data="unbind_sec"),
+        ],
+        [InlineKeyboardButton("🔙 Back", callback_data="back")],
     ])
 
 def _kb_change() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("OTP", callback_data="change_otp"), InlineKeyboardButton("Security Code", callback_data="change_sec")],
-        [InlineKeyboardButton("Back", callback_data="back")]
+        [
+            InlineKeyboardButton("📧 OTP", callback_data="change_otp"),
+            InlineKeyboardButton("🔐 Security Code", callback_data="change_sec"),
+        ],
+        [InlineKeyboardButton("🔙 Back", callback_data="back")],
     ])
 
 # ====== COMMAND HANDLERS ======
@@ -560,18 +589,18 @@ async def conv_change_new_otp(update: Update, context: ContextTypes.DEFAULT_TYPE
 # ====== CALLBACK HANDLER ======
 
 async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
+    q = update.callback_query
+    await q.answer()
     
-    data = query.data
-    user_id = query.from_user.id
+    data = q.data
+    user_id = q.from_user.id
     
     if data == "back":
-        await query.edit_message_text(_fmt_start(query.from_user.username or "User"), parse_mode="HTML", reply_markup=_kb_main())
+        await q.edit_message_text(_fmt_start(q.from_user.username or "User"), parse_mode="HTML", reply_markup=_kb_main())
         return
     
     if data == "cancel":
-        await query.edit_message_text("<blockquote><b>تـم الإلـغـاء</b></blockquote>", parse_mode="HTML", reply_markup=_kb_main())
+        await q.edit_message_text("<blockquote><b>تـم الإلـغـاء</b></blockquote>", parse_mode="HTML", reply_markup=_kb_main())
         return
     
     if data == "cmd_info":
@@ -600,9 +629,8 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ====== MAIN ======
 
 def main():
-    app = Application.builder().token(TOKEN).build()
+    app = Application.builder().token(TOKEN).request(request).build()
     
-    # Commands
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("info", cmd_info))
     app.add_handler(CommandHandler("cancel", cmd_cancel))
@@ -610,10 +638,8 @@ def main():
     app.add_handler(CommandHandler("platforms", cmd_platforms))
     app.add_handler(CommandHandler("status", cmd_status))
     
-    # Callback handler (الأزرار)
     app.add_handler(CallbackQueryHandler(callback_handler))
     
-    # Bind conversation
     app.add_handler(ConversationHandler(
         entry_points=[CommandHandler("bind", conv_bind_start), CallbackQueryHandler(conv_bind_start, pattern="^cmd_bind$")],
         states={
@@ -624,7 +650,6 @@ def main():
         fallbacks=[CommandHandler("cancel", cmd_cancel)]
     ))
     
-    # Unbind conversation
     app.add_handler(ConversationHandler(
         entry_points=[CommandHandler("unbind", conv_unbind_start), CallbackQueryHandler(conv_unbind_start, pattern="^cmd_unbind$")],
         states={
@@ -635,7 +660,6 @@ def main():
         fallbacks=[CommandHandler("cancel", cmd_cancel)]
     ))
     
-    # Change conversation
     app.add_handler(ConversationHandler(
         entry_points=[CommandHandler("change", conv_change_start), CallbackQueryHandler(conv_change_start, pattern="^cmd_change$")],
         states={

@@ -90,7 +90,7 @@ class GarenaAPI:
 
 _gapi = GarenaAPI()
 
-# ====== FORMAT FUNCTIONS (اقتباس + تغليض + تمديد النص) ======
+# ====== FORMAT FUNCTIONS ======
 
 def _fmt_start(username: str) -> str:
     return (
@@ -135,16 +135,6 @@ def _fmt_platforms(bound: List[int], available: List[int]) -> str:
         "</blockquote>"
     )
 
-def _fmt_result(success: bool, title: str, details: str = "") -> str:
-    status = "Success" if success else "Failed"
-    return (
-        "<blockquote>"
-        f"<b>{title}</b>\n\n"
-        f"<b>Status:</b> {status}\n"
-        f"{details}"
-        "</blockquote>"
-    ).strip()
-
 def _fmt_status() -> str:
     return (
         "<blockquote>"
@@ -156,7 +146,7 @@ def _fmt_status() -> str:
         "</blockquote>"
     )
 
-# ====== KEYBOARDS (بدون إيموجي) ======
+# ====== KEYBOARDS ======
 
 def _kb_main() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
@@ -246,45 +236,117 @@ async def conv_bind_email(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await msg.edit_text(f"<blockquote><b>فـشـل إرسـال OTP</b>\n\n<b>الـخطـأ:</b> {d.get('error', 'Unknown')}</blockquote>", parse_mode="HTML")
         return ConversationHandler.END
 
-async def conv_bind_otp(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    uid = update.effective_user.id
-    o = update.message.text.strip()
-    if uid not in _user_sessions:
-        await update.message.reply_text("<blockquote><b>انـتـهـت الـجـلـسـة</b>\n\n<b>ابـدأ مـن جـديـد بـ /bind</b></blockquote>", parse_mode="HTML")
-        return ConversationHandler.END
-    e = _user_sessions[uid].get("email", "")
-    t = _user_sessions[uid]["token"]
-    msg = await update.message.reply_text("<blockquote><b>جـاري الـتـحـقـق مـن OTP...</b></blockquote>", parse_mode="HTML")
-    v = _gapi.verify_otp(e, o, t)
-    if not v:
-        await msg.edit_text("<blockquote><b>OTP غـيـر صـالـح</b>\n\n<b>الـرجـاء إعـادة الـمـحـاولـة</b></blockquote>", parse_mode="HTML")
-        return ConversationHandler.END
-    _user_sessions[uid]["verifier"] = v
-    await msg.edit_text(f"<blockquote><b>تـم الـتـحـقـق مـن OTP</b>\n\n<b>الـبـريـد:</b> {e}\n\n<b>أدخـل كـود الأمـان (6 أرقـام):</b></blockquote>", parse_mode="HTML")
-    return STATE_BIND_SEC
+# ====== CALLBACK HANDLER (الأزرار هنا) ======
 
-async def conv_bind_sec(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    
+    data = query.data
+    user_id = query.from_user.id
+    
+    if data == "back":
+        await query.edit_message_text(_fmt_start(query.from_user.username or "User"), parse_mode="HTML", reply_markup=_kb_main())
+        return
+    
+    if data == "cancel":
+        await query.edit_message_text("<blockquote><b>تـم الإلـغـاء</b></blockquote>", parse_mode="HTML", reply_markup=_kb_main())
+        return
+    
+    # الأوامر
+    if data == "cmd_info":
+        await cmd_info(update, context)
+    elif data == "cmd_bind":
+        await conv_bind_start(update, context)
+    elif data == "cmd_unbind":
+        await conv_unbind_start(update, context)
+    elif data == "cmd_change":
+        await conv_change_start(update, context)
+    elif data == "cmd_cancel":
+        await cmd_cancel(update, context)
+    elif data == "cmd_revoke":
+        await cmd_revoke_start(update, context)
+    elif data == "cmd_platforms":
+        await cmd_platforms(update, context)
+    elif data == "cmd_status":
+        await cmd_status(update, context)
+    elif data == "confirm_revoke":
+        await cmd_revoke_confirm(update, context)
+    elif data in ["unbind_otp", "unbind_sec"]:
+        await conv_unbind_choice(update, context)
+    elif data in ["change_otp", "change_sec"]:
+        await conv_change_choice(update, context)
+
+# ====== COMMANDS ======
+
+async def cmd_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     uid = update.effective_user.id
-    s = update.message.text.strip()
-    if len(s) != 6 or not s.isdigit():
-        await update.message.reply_text("<blockquote><b>كـود غـيـر صـالـح</b>\n\n<b>يـجـب أن يـكـون 6 أرقـام</b></blockquote>", parse_mode="HTML")
-        return STATE_BIND_SEC
     if uid not in _user_sessions:
-        await update.message.reply_text("<blockquote><b>انـتـهـت الـجـلـسـة</b>\n\n<b>ابـدأ مـن جـديـد بـ /bind</b></blockquote>", parse_mode="HTML")
-        return ConversationHandler.END
-    e = _user_sessions[uid].get("email", "")
-    t = _user_sessions[uid]["token"]
-    v = _user_sessions[uid].get("verifier", "")
-    msg = await update.message.reply_text("<blockquote><b>جـاري إنـشـاء طـلـب الـربـط...</b></blockquote>", parse_mode="HTML")
-    r = _gapi.create_bind(e, t, v, s)
+        await update.message.reply_text("<blockquote><b>لا تـوجـد جـلـسـة نـشـطـة</b></blockquote>", parse_mode="HTML")
+        return
+    t = _user_sessions[uid].get("token", "")
+    if not t:
+        await update.message.reply_text("<blockquote><b>لا تـوجـد طـلـبـات</b></blockquote>", parse_mode="HTML")
+        return
+    msg = await update.message.reply_text("<blockquote><b>جـاري إلـغـاء الـطـلـب...</b></blockquote>", parse_mode="HTML")
+    r = _gapi.cancel(t)
     d = r.json() if r.status_code == 200 else {}
     if d.get("result") == 0:
-        await msg.edit_text(f"<blockquote><b>تـم ربـط الـبـريـد</b>\n\n<b>الـبـريـد:</b> {e}\n<b>الـحـالـة:</b> Success</blockquote>", parse_mode="HTML")
-        _log_op(uid, "bind", "success", f"email={e}")
+        await msg.edit_text("<blockquote><b>تـم إلـغـاء الـطـلـب</b>\n\n<b>الـحـالـة:</b> Success</blockquote>", parse_mode="HTML")
+        _log_op(uid, "cancel", "success", "")
     else:
-        await msg.edit_text(f"<blockquote><b>فـشـل ربـط الـبـريـد</b>\n\n<b>الـخطـأ:</b> {d.get('error', 'Unknown')}</blockquote>", parse_mode="HTML")
-        _log_op(uid, "bind", "failed", d.get("error", ""))
-    return ConversationHandler.END
+        await msg.edit_text(f"<blockquote><b>فـشـل إلـغـاء الـطـلـب</b>\n\n<b>الـخطـأ:</b> {d.get('error', 'Unknown')}</blockquote>", parse_mode="HTML")
+        _log_op(uid, "cancel", "failed", d.get("error", ""))
+
+async def cmd_revoke_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    uid = update.effective_user.id
+    if uid not in _user_sessions or "token" not in _user_sessions[uid]:
+        await update.message.reply_text("<blockquote><b>لـم يـتـم تـسـجـيـل الـدخـول</b>\n\n<b>اسـتـخـدم /bind أو أي أمـر آخـر لإدخـال الـتـوكـن</b></blockquote>", parse_mode="HTML")
+        return
+    t = _user_sessions[uid]["token"]
+    uid2, nick, region = _gapi.player(t)
+    if uid2 is None:
+        await update.message.reply_text("<blockquote><b>تـوكـن غـيـر صـالـح</b></blockquote>", parse_mode="HTML")
+        return
+    await update.message.reply_text(f"<blockquote><b>تـأكـيـد إلـغـاء الـتـوكـن</b>\n\n<b>UID:</b> {uid2}\n<b>Nick:</b> {nick}\n\n<b>هـل أنـت مـتـأكـد؟</b></blockquote>", parse_mode="HTML", reply_markup=_kb_confirm("revoke"))
+
+async def cmd_revoke_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    q = update.callback_query
+    await q.answer()
+    uid = q.from_user.id
+    if uid not in _user_sessions:
+        await q.edit_message_text("<blockquote><b>انـتـهـت الـجـلـسـة</b></blockquote>", parse_mode="HTML")
+        return
+    t = _user_sessions[uid].get("token", "")
+    if q.data == "confirm_revoke":
+        msg = await q.edit_message_text("<blockquote><b>جـاري إلـغـاء الـتـوكـن...</b></blockquote>", parse_mode="HTML")
+        r = _gapi.revoke(t)
+        if r.status_code == 200 and "error" not in r.text:
+            await msg.edit_text("<blockquote><b>تـم إلـغـاء الـتـوكـن</b>\n\n<b>الـحـالـة:</b> Success</blockquote>", parse_mode="HTML")
+            _log_op(uid, "revoke", "success", "")
+            _user_sessions.pop(uid, None)
+        else:
+            await msg.edit_text(f"<blockquote><b>فـشـل إلـغـاء الـتـوكـن</b>\n\n<b>الـخطـأ:</b> {r.status_code}</blockquote>", parse_mode="HTML")
+            _log_op(uid, "revoke", "failed", str(r.status_code))
+    else:
+        await q.edit_message_text("<blockquote><b>تـم الإلـغـاء</b></blockquote>", parse_mode="HTML")
+
+async def cmd_platforms(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    uid = update.effective_user.id
+    if uid not in _user_sessions or "token" not in _user_sessions[uid]:
+        await update.message.reply_text("<blockquote><b>لـم يـتـم تـسـجـيـل الـدخـول</b>\n\n<b>اسـتـخـدم /bind أو أي أمـر آخـر لإدخـال الـتـوكـن</b></blockquote>", parse_mode="HTML")
+        return
+    t = _user_sessions[uid]["token"]
+    msg = await update.message.reply_text("<blockquote><b>جـاري جـلـب الـمـنـصـات...</b></blockquote>", parse_mode="HTML")
+    d = _gapi.platforms(t)
+    if d is None:
+        await msg.edit_text("<blockquote><b>فـشـل جـلـب الـمـنـصـات</b></blockquote>", parse_mode="HTML")
+        return
+    await msg.edit_text(_fmt_platforms(d.get("bounded_accounts", []), d.get("available_platforms", [])), parse_mode="HTML")
+    _log_op(uid, "platforms", "success", f"bound={len(d.get('bounded_accounts', []))}")
+
+async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(_fmt_status(), parse_mode="HTML")
 
 # ====== UNBIND CONVERSATION ======
 
@@ -498,111 +560,23 @@ async def conv_change_new_otp(update: Update, context: ContextTypes.DEFAULT_TYPE
         _log_op(uid, "change", "failed", d.get("error", ""))
     return ConversationHandler.END
 
-# ====== OTHER COMMANDS ======
-
-async def cmd_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    uid = update.effective_user.id
-    if uid not in _user_sessions:
-        await update.message.reply_text("<blockquote><b>لا تـوجـد جـلـسـة نـشـطـة</b></blockquote>", parse_mode="HTML")
-        return
-    t = _user_sessions[uid].get("token", "")
-    if not t:
-        await update.message.reply_text("<blockquote><b>لا تـوجـد طـلـبـات</b></blockquote>", parse_mode="HTML")
-        return
-    msg = await update.message.reply_text("<blockquote><b>جـاري إلـغـاء الـطـلـب...</b></blockquote>", parse_mode="HTML")
-    r = _gapi.cancel(t)
-    d = r.json() if r.status_code == 200 else {}
-    if d.get("result") == 0:
-        await msg.edit_text("<blockquote><b>تـم إلـغـاء الـطـلـب</b>\n\n<b>الـحـالـة:</b> Success</blockquote>", parse_mode="HTML")
-        _log_op(uid, "cancel", "success", "")
-    else:
-        await msg.edit_text(f"<blockquote><b>فـشـل إلـغـاء الـطـلـب</b>\n\n<b>الـخطـأ:</b> {d.get('error', 'Unknown')}</blockquote>", parse_mode="HTML")
-        _log_op(uid, "cancel", "failed", d.get("error", ""))
-
-async def cmd_revoke_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    uid = update.effective_user.id
-    if uid not in _user_sessions or "token" not in _user_sessions[uid]:
-        await update.message.reply_text("<blockquote><b>لـم يـتـم تـسـجـيـل الـدخـول</b>\n\n<b>اسـتـخـدم /bind أو أي أمـر آخـر لإدخـال الـتـوكـن</b></blockquote>", parse_mode="HTML")
-        return
-    t = _user_sessions[uid]["token"]
-    uid2, nick, region = _gapi.player(t)
-    if uid2 is None:
-        await update.message.reply_text("<blockquote><b>تـوكـن غـيـر صـالـح</b></blockquote>", parse_mode="HTML")
-        return
-    await update.message.reply_text(f"<blockquote><b>تـأكـيـد إلـغـاء الـتـوكـن</b>\n\n<b>UID:</b> {uid2}\n<b>Nick:</b> {nick}\n\n<b>هـل أنـت مـتـأكـد؟</b></blockquote>", parse_mode="HTML", reply_markup=_kb_confirm("revoke"))
-
-async def cmd_revoke_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    q = update.callback_query
-    await q.answer()
-    uid = q.from_user.id
-    if uid not in _user_sessions:
-        await q.edit_message_text("<blockquote><b>انـتـهـت الـجـلـسـة</b></blockquote>", parse_mode="HTML")
-        return
-    t = _user_sessions[uid].get("token", "")
-    if q.data == "confirm_revoke":
-        msg = await q.edit_message_text("<blockquote><b>جـاري إلـغـاء الـتـوكـن...</b></blockquote>", parse_mode="HTML")
-        r = _gapi.revoke(t)
-        if r.status_code == 200 and "error" not in r.text:
-            await msg.edit_text("<blockquote><b>تـم إلـغـاء الـتـوكـن</b>\n\n<b>الـحـالـة:</b> Success</blockquote>", parse_mode="HTML")
-            _log_op(uid, "revoke", "success", "")
-            _user_sessions.pop(uid, None)
-        else:
-            await msg.edit_text(f"<blockquote><b>فـشـل إلـغـاء الـتـوكـن</b>\n\n<b>الـخطـأ:</b> {r.status_code}</blockquote>", parse_mode="HTML")
-            _log_op(uid, "revoke", "failed", str(r.status_code))
-    else:
-        await q.edit_message_text("<blockquote><b>تـم الإلـغـاء</b></blockquote>", parse_mode="HTML")
-
-async def cmd_platforms(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    uid = update.effective_user.id
-    if uid not in _user_sessions or "token" not in _user_sessions[uid]:
-        await update.message.reply_text("<blockquote><b>لـم يـتـم تـسـجـيـل الـدخـول</b>\n\n<b>اسـتـخـدم /bind أو أي أمـر آخـر لإدخـال الـتـوكـن</b></blockquote>", parse_mode="HTML")
-        return
-    t = _user_sessions[uid]["token"]
-    msg = await update.message.reply_text("<blockquote><b>جـاري جـلـب الـمـنـصـات...</b></blockquote>", parse_mode="HTML")
-    d = _gapi.platforms(t)
-    if d is None:
-        await msg.edit_text("<blockquote><b>فـشـل جـلـب الـمـنـصـات</b></blockquote>", parse_mode="HTML")
-        return
-    await msg.edit_text(_fmt_platforms(d.get("bounded_accounts", []), d.get("available_platforms", [])), parse_mode="HTML")
-    _log_op(uid, "platforms", "success", f"bound={len(d.get('bounded_accounts', []))}")
-
-async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(_fmt_status(), parse_mode="HTML")
-
-async def _cb_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    q = update.callback_query
-    await q.answer()
-    d = q.data
-    if d == "back":
-        await q.edit_message_text(_fmt_start(q.from_user.username or "User"), parse_mode="HTML", reply_markup=_kb_main())
-        return
-    if d == "cancel":
-        await q.edit_message_text("<blockquote><b>تـم الإلـغـاء</b></blockquote>", parse_mode="HTML", reply_markup=_kb_main())
-        return
-    cmd_map = {
-        "cmd_info": cmd_info,
-        "cmd_bind": conv_bind_start,
-        "cmd_unbind": conv_unbind_start,
-        "cmd_change": conv_change_start,
-        "cmd_cancel": cmd_cancel,
-        "cmd_revoke": cmd_revoke_start,
-        "cmd_platforms": cmd_platforms,
-        "cmd_status": cmd_status
-    }
-    if d in cmd_map:
-        await cmd_map[d](update, context)
+# ====== MAIN ======
 
 def main():
     app = Application.builder().token(TOKEN).build()
+    
+    # Commands
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("info", cmd_info))
     app.add_handler(CommandHandler("cancel", cmd_cancel))
     app.add_handler(CommandHandler("revoke", cmd_revoke_start))
     app.add_handler(CommandHandler("platforms", cmd_platforms))
     app.add_handler(CommandHandler("status", cmd_status))
-    app.add_handler(CallbackQueryHandler(_cb_handler, pattern="^(cmd_|confirm_|unbind_|change_|back|cancel)"))
-    app.add_handler(CallbackQueryHandler(cmd_revoke_confirm, pattern="^confirm_revoke$"))
     
+    # Callback handler (الأزرار)
+    app.add_handler(CallbackQueryHandler(callback_handler))
+    
+    # Conversation handlers
     app.add_handler(ConversationHandler(
         entry_points=[CommandHandler("bind", conv_bind_start), CallbackQueryHandler(conv_bind_start, pattern="^cmd_bind$")],
         states={
@@ -610,7 +584,7 @@ def main():
             STATE_BIND_OTP: [MessageHandler(filters.TEXT & ~filters.COMMAND, conv_bind_email)],
             STATE_BIND_SEC: [MessageHandler(filters.TEXT & ~filters.COMMAND, conv_bind_otp)]
         },
-        fallbacks=[CommandHandler("cancel", cmd_cancel), CallbackQueryHandler(lambda u, c: ConversationHandler.END, pattern="^cancel$")]
+        fallbacks=[CommandHandler("cancel", cmd_cancel)]
     ))
     
     app.add_handler(ConversationHandler(
@@ -620,7 +594,7 @@ def main():
             STATE_UNBIND_OTP: [MessageHandler(filters.TEXT & ~filters.COMMAND, conv_unbind_otp)],
             STATE_UNBIND_SEC: [MessageHandler(filters.TEXT & ~filters.COMMAND, conv_unbind_sec)]
         },
-        fallbacks=[CommandHandler("cancel", cmd_cancel), CallbackQueryHandler(lambda u, c: ConversationHandler.END, pattern="^cancel$")]
+        fallbacks=[CommandHandler("cancel", cmd_cancel)]
     ))
     
     app.add_handler(ConversationHandler(
@@ -632,11 +606,8 @@ def main():
             STATE_CHANGE_NEW_EMAIL: [MessageHandler(filters.TEXT & ~filters.COMMAND, conv_change_new_email)],
             STATE_CHANGE_NEW_OTP: [MessageHandler(filters.TEXT & ~filters.COMMAND, conv_change_new_otp)]
         },
-        fallbacks=[CommandHandler("cancel", cmd_cancel), CallbackQueryHandler(lambda u, c: ConversationHandler.END, pattern="^cancel$")]
+        fallbacks=[CommandHandler("cancel", cmd_cancel)]
     ))
-    
-    app.add_handler(CallbackQueryHandler(conv_unbind_choice, pattern="^(unbind_otp|unbind_sec)$"))
-    app.add_handler(CallbackQueryHandler(conv_change_choice, pattern="^(change_otp|change_sec)$"))
     
     print("\n" + "="*50)
     print("GARENA MANAGER BOT v9.0")

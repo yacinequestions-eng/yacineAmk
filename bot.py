@@ -4,6 +4,10 @@
 # Developer : @yacine_X6
 # Channel   : @UESM_Team
 # ============================================
+# ============================================
+# الجزء 1: الإعدادات والمتغيرات
+# ============================================
+# ============================================
 
 import logging
 import os
@@ -29,12 +33,7 @@ logger = logging.getLogger(__name__)
 TOKEN = "8422372449:AAGZxNXJzli5pQvCJeh_rygqhAhn9dtwoPM"
 ADMIN_ID = 6936293942
 
-request = HTTPXRequest(
-    connect_timeout=30.0,
-    read_timeout=30.0,
-    write_timeout=30.0,
-    pool_timeout=30.0,
-)
+request = HTTPXRequest(connect_timeout=30.0, read_timeout=30.0, write_timeout=30.0, pool_timeout=30.0)
 
 GA_HEADERS = {"User-Agent": "GarenaMSDK/4.0.30", "Content-Type": "application/x-www-form-urlencoded", "Accept": "application/json"}
 GA_BASE = "https://100067.connect.garena.com"
@@ -46,59 +45,107 @@ STATE_MENU, STATE_BIND_EMAIL, STATE_BIND_OTP, STATE_BIND_SEC, STATE_UNBIND_CHOIC
 
 _user_sessions: Dict[int, Dict[str, Any]] = {}
 _operation_log: List[Dict[str, Any]] = []
+# ============================================
+# الجزء 2: دوال مساعدة
+# ============================================
 
 def _sec_to_str(s: int) -> str:
-    d, s = divmod(s, 86400); h, s = divmod(s, 3600); m, s = divmod(s, 60)
-    return " ".join([f"{d}d" for _ in [1] if d] + [f"{h}h" for _ in [1] if h] + [f"{m}m" for _ in [1] if m] + [f"{s}s" for _ in [1] if s]) or "0s"
+    d, s = divmod(s, 86400)
+    h, s = divmod(s, 3600)
+    m, s = divmod(s, 60)
+    parts = []
+    if d: parts.append(f"{d}d")
+    if h: parts.append(f"{h}h")
+    if m: parts.append(f"{m}m")
+    if s: parts.append(f"{s}s")
+    return " ".join(parts) or "0s"
 
 def _log_op(uid: int, action: str, status: str, details: str = ""):
-    _operation_log.append({"timestamp": datetime.now().isoformat(), "user_id": uid, "action": action, "status": status, "details": details})
-    if len(_operation_log) > 1000: _operation_log.pop(0)
+    _operation_log.append({
+        "timestamp": datetime.now().isoformat(),
+        "user_id": uid,
+        "action": action,
+        "status": status,
+        "details": details
+    })
+    if len(_operation_log) > 1000:
+        _operation_log.pop(0)
+        # ============================================
+# الجزء 3: دوال API (GarenaAPI)
+# ============================================
 
 class GarenaAPI:
-    def __init__(self): self.session = requests.Session(); self.session.headers.update(GA_HEADERS)
-    def _g(self, e: str, p: dict) -> requests.Response: return self.session.get(f"{GA_BASE}{e}", params=p, timeout=15, verify=False)
-    def _p(self, e: str, d: dict) -> requests.Response: return self.session.post(f"{GA_BASE}{e}", data=d, timeout=15, verify=False)
+    def __init__(self):
+        self.session = requests.Session()
+        self.session.headers.update(GA_HEADERS)
+
+    def _get(self, e: str, p: dict) -> requests.Response:
+        return self.session.get(f"{GA_BASE}{e}", params=p, timeout=15, verify=False)
+
+    def _post(self, e: str, d: dict) -> requests.Response:
+        return self.session.post(f"{GA_BASE}{e}", data=d, timeout=15, verify=False)
+
     def player(self, t: str) -> Tuple[Optional[str], Optional[str], Optional[str]]:
         try:
             r = requests.get(f"https://api-otrss.garena.com/support/callback/?access_token={t}", headers={"User-Agent": GA_HEADERS["User-Agent"]}, allow_redirects=True, timeout=15)
             q = urllib.parse.parse_qs(urllib.parse.urlparse(r.url).query)
             return q.get("account_id", ["Unknown"])[0], q.get("nickname", ["Unknown"])[0], q.get("region", ["Unknown"])[0]
-        except: return None, None, None
+        except:
+            return None, None, None
+
     def bind_info(self, t: str) -> Optional[dict]:
-        try: r = self._g("/game/account_security/bind:get_bind_info", {"xMaSrY": GA_APPID, "access_token": t}); return r.json() if r.status_code == 200 else None
-        except: return None
+        try:
+            r = self._get("/game/account_security/bind:get_bind_info", {"xMaSrY": GA_APPID, "access_token": t})
+            return r.json() if r.status_code == 200 else None
+        except:
+            return None
+
     def send_otp(self, e: str, t: str) -> requests.Response:
-        return self._p("/game/account_security/bind:send_otp", {"email": e, "locale": "en_PK", "region": "PK", "xMaSrY": GA_APPID, "access_token": t})
+        return self._post("/game/account_security/bind:send_otp", {"email": e, "locale": "en_PK", "region": "PK", "xMaSrY": GA_APPID, "access_token": t})
+
     def verify_otp(self, e: str, o: str, t: str) -> Optional[str]:
         try:
-            r = self._p("/game/account_security/bind:verify_otp", {"email": e, "xMaSrY": GA_APPID, "access_token": t, "code": o, "otp": o, "type": "1"})
+            r = self._post("/game/account_security/bind:verify_otp", {"email": e, "xMaSrY": GA_APPID, "access_token": t, "code": o, "otp": o, "type": "1"})
             return r.json().get("verifier_token")
-        except: return None
+        except:
+            return None
+
     def verify_identity(self, e: str, t: str, o: str = None, s: str = None) -> Optional[str]:
         try:
             d = {"email": e, "xMaSrY": GA_APPID, "access_token": t}
             if o: d["otp"] = o
             elif s: d["secondary_password"] = hashlib.sha256(s.encode()).hexdigest()
-            r = self._p("/game/account_security/bind:verify_identity", d); return r.json().get("identity_token")
-        except: return None
+            r = self._post("/game/account_security/bind:verify_identity", d)
+            return r.json().get("identity_token")
+        except:
+            return None
+
     def create_bind(self, e: str, t: str, v: str, s: str) -> requests.Response:
-        return self._p("/game/account_security/bind:create_bind_request", {"email": e, "xMaSrY": GA_APPID, "access_token": t, "verifier_token": v, "secondary_password": s})
+        return self._post("/game/account_security/bind:create_bind_request", {"email": e, "xMaSrY": GA_APPID, "access_token": t, "verifier_token": v, "secondary_password": s})
+
     def create_unbind(self, t: str, i: str) -> requests.Response:
-        return self._p("/game/account_security/bind:create_unbind_request", {"xMaSrY": GA_APPID, "access_token": t, "identity_token": i})
+        return self._post("/game/account_security/bind:create_unbind_request", {"xMaSrY": GA_APPID, "access_token": t, "identity_token": i})
+
     def create_rebind(self, i: str, e: str, t: str, v: str) -> requests.Response:
-        return self._p("/game/account_security/bind:create_rebind_request", {"identity_token": i, "email": e, "xMaSrY": GA_APPID, "verifier_token": v, "access_token": t})
+        return self._post("/game/account_security/bind:create_rebind_request", {"identity_token": i, "email": e, "xMaSrY": GA_APPID, "verifier_token": v, "access_token": t})
+
     def cancel(self, t: str) -> requests.Response:
-        return self._p("/game/account_security/bind:cancel_request", {"xMaSrY": GA_APPID, "access_token": t})
+        return self._post("/game/account_security/bind:cancel_request", {"xMaSrY": GA_APPID, "access_token": t})
+
     def revoke(self, t: str) -> requests.Response:
         return self.session.get(f"{GA_BASE}/oauth/logout?access_token={t}&refresh_token=1380dcb63ab3a077dc05bdf0b25ba4497c403a5b4eae96d7203010eafa6c83a8", headers=GA_HEADERS, timeout=15)
+
     def platforms(self, t: str) -> Optional[dict]:
-        try: r = self._g("/bind/app/platform/info/get", {"access_token": t}); return r.json() if r.status_code == 200 else None
-        except: return None
+        try:
+            r = self._get("/bind/app/platform/info/get", {"access_token": t})
+            return r.json() if r.status_code == 200 else None
+        except:
+            return None
 
 _gapi = GarenaAPI()
-
-# ====== FORMAT FUNCTIONS ======
+# ============================================
+# الجزء 4: دوال التنسيق والأزرار
+# ============================================
 
 def _fmt_start(username: str) -> str:
     return (
@@ -154,55 +201,33 @@ def _fmt_status() -> str:
         "</blockquote>"
     )
 
-# ====== KEYBOARDS (أزرار ملونة + Bold) ======
-
 def _kb_main() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton("🔵 Info", callback_data="cmd_info"),
-            InlineKeyboardButton("🟢 Bind", callback_data="cmd_bind"),
-        ],
-        [
-            InlineKeyboardButton("🟡 Unbind", callback_data="cmd_unbind"),
-            InlineKeyboardButton("🟠 Change", callback_data="cmd_change"),
-        ],
-        [
-            InlineKeyboardButton("🔴 Revoke", callback_data="cmd_revoke"),
-            InlineKeyboardButton("⚪ Cancel", callback_data="cmd_cancel"),
-        ],
-        [
-            InlineKeyboardButton("🟣 Platforms", callback_data="cmd_platforms"),
-            InlineKeyboardButton("🔵 Status", callback_data="cmd_status"),
-        ],
+        [InlineKeyboardButton("🔵 Info", callback_data="cmd_info"), InlineKeyboardButton("🟢 Bind", callback_data="cmd_bind")],
+        [InlineKeyboardButton("🟡 Unbind", callback_data="cmd_unbind"), InlineKeyboardButton("🟠 Change", callback_data="cmd_change")],
+        [InlineKeyboardButton("🔴 Revoke", callback_data="cmd_revoke"), InlineKeyboardButton("⚪ Cancel", callback_data="cmd_cancel")],
+        [InlineKeyboardButton("🟣 Platforms", callback_data="cmd_platforms"), InlineKeyboardButton("🔵 Status", callback_data="cmd_status")]
     ])
 
 def _kb_confirm(action: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton("✅ Confirm", callback_data=f"confirm_{action}"),
-            InlineKeyboardButton("❌ Cancel", callback_data="cancel"),
-        ],
+        [InlineKeyboardButton("✅ Confirm", callback_data=f"confirm_{action}"), InlineKeyboardButton("❌ Cancel", callback_data="cancel")]
     ])
 
 def _kb_unbind() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton("📧 OTP", callback_data="unbind_otp"),
-            InlineKeyboardButton("🔐 Security Code", callback_data="unbind_sec"),
-        ],
-        [InlineKeyboardButton("🔙 Back", callback_data="back")],
+        [InlineKeyboardButton("📧 OTP", callback_data="unbind_otp"), InlineKeyboardButton("🔐 Security Code", callback_data="unbind_sec")],
+        [InlineKeyboardButton("🔙 Back", callback_data="back")]
     ])
 
 def _kb_change() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton("📧 OTP", callback_data="change_otp"),
-            InlineKeyboardButton("🔐 Security Code", callback_data="change_sec"),
-        ],
-        [InlineKeyboardButton("🔙 Back", callback_data="back")],
+        [InlineKeyboardButton("📧 OTP", callback_data="change_otp"), InlineKeyboardButton("🔐 Security Code", callback_data="change_sec")],
+        [InlineKeyboardButton("🔙 Back", callback_data="back")]
     ])
-
-# ====== COMMAND HANDLERS ======
+    # ============================================
+# الجزء 5: معالجات الأوامر والمحادثات
+# ============================================
 
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
@@ -293,8 +318,9 @@ async def cmd_platforms(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(_fmt_status(), parse_mode="HTML")
-
-# ====== BIND CONVERSATION ======
+    # ============================================
+# الجزء 6: معالجات المحادثات (Conversations)
+# ============================================
 
 async def conv_bind_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
@@ -373,8 +399,6 @@ async def conv_bind_sec(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await msg.edit_text(f"<blockquote><b>فـشـل ربـط الـبـريـد</b>\n\n<b>الـخطـأ:</b> {d.get('error', 'Unknown')}</blockquote>", parse_mode="HTML")
         _log_op(uid, "bind", "failed", d.get("error", ""))
     return ConversationHandler.END
-
-# ====== UNBIND CONVERSATION ======
 
 async def conv_unbind_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
@@ -473,8 +497,6 @@ async def conv_unbind_sec(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await msg.edit_text(f"<blockquote><b>فـشـل فـك ربـط الـبـريـد</b>\n\n<b>الـخطـأ:</b> {d.get('error', 'Unknown')}</blockquote>", parse_mode="HTML")
         _log_op(uid, "unbind", "failed", d.get("error", ""))
     return ConversationHandler.END
-
-# ====== CHANGE CONVERSATION ======
 
 async def conv_change_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
@@ -585,24 +607,23 @@ async def conv_change_new_otp(update: Update, context: ContextTypes.DEFAULT_TYPE
         await msg.edit_text(f"<blockquote><b>فـشـل تـغـيـيـر الـبـريـد</b>\n\n<b>الـخطـأ:</b> {d.get('error', 'Unknown')}</blockquote>", parse_mode="HTML")
         _log_op(uid, "change", "failed", d.get("error", ""))
     return ConversationHandler.END
-
-# ====== CALLBACK HANDLER ======
+    # ============================================
+# الجزء 7: معالج الأزرار والتشغيل الرئيسي
+# ============================================
 
 async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
-    
     data = q.data
-    user_id = q.from_user.id
     
     if data == "back":
         await q.edit_message_text(_fmt_start(q.from_user.username or "User"), parse_mode="HTML", reply_markup=_kb_main())
         return
-    
     if data == "cancel":
         await q.edit_message_text("<blockquote><b>تـم الإلـغـاء</b></blockquote>", parse_mode="HTML", reply_markup=_kb_main())
         return
     
+    # الأوامر
     if data == "cmd_info":
         await cmd_info(update, context)
     elif data == "cmd_bind":
@@ -626,11 +647,10 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data in ["change_otp", "change_sec"]:
         await conv_change_choice(update, context)
 
-# ====== MAIN ======
-
 def main():
     app = Application.builder().token(TOKEN).request(request).build()
     
+    # الأوامر النصية
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("info", cmd_info))
     app.add_handler(CommandHandler("cancel", cmd_cancel))
@@ -638,8 +658,10 @@ def main():
     app.add_handler(CommandHandler("platforms", cmd_platforms))
     app.add_handler(CommandHandler("status", cmd_status))
     
+    # معالج الأزرار
     app.add_handler(CallbackQueryHandler(callback_handler))
     
+    # محادثة الربط
     app.add_handler(ConversationHandler(
         entry_points=[CommandHandler("bind", conv_bind_start), CallbackQueryHandler(conv_bind_start, pattern="^cmd_bind$")],
         states={
@@ -650,6 +672,7 @@ def main():
         fallbacks=[CommandHandler("cancel", cmd_cancel)]
     ))
     
+    # محادثة فك الربط
     app.add_handler(ConversationHandler(
         entry_points=[CommandHandler("unbind", conv_unbind_start), CallbackQueryHandler(conv_unbind_start, pattern="^cmd_unbind$")],
         states={
@@ -660,6 +683,7 @@ def main():
         fallbacks=[CommandHandler("cancel", cmd_cancel)]
     ))
     
+    # محادثة تغيير البريد
     app.add_handler(ConversationHandler(
         entry_points=[CommandHandler("change", conv_change_start), CallbackQueryHandler(conv_change_start, pattern="^cmd_change$")],
         states={

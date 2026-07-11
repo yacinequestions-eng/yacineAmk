@@ -5,19 +5,19 @@ from io import BytesIO
 import logging
 import os
 
-# ================= التوكن =================
+# ================= TOKEN =================
 BOT_TOKEN = "7792196548:AAHaWkIJXqnWxj51IJm0SI4_DWDpiMOCfiU"
 bot = telebot.TeleBot(BOT_TOKEN)
 
-# ========= روابط الـ API =========
+# ========= API LINKS =========
 INFO_API = "https://nirob-x-info.vercel.app/info?uid={uid}"
 OUTFIT_API = "https://nirob-free-fire-outfit.vercel.app/get?uid={uid}"
 WELCOME_IMAGE = "https://freeimage.host/i/C07A0Cu"
 
-# ========= إعدادات التسجيل =========
+# ========= LOGGING =========
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# ========= دالة تحويل الوقت =========
+# ========= CONVERT TIME =========
 def convert_time(timestamp):
     try:
         if not timestamp:
@@ -29,7 +29,7 @@ def convert_time(timestamp):
     except:
         return "✿ غير موجود"
 
-# ========= تنسيق معلومات اللاعب =========
+# ========= FORMAT PLAYER INFO =========
 def format_player_info(data, uid):
     basic = data.get("basicInfo", {})
     profile = data.get("profileInfo", {})
@@ -60,9 +60,9 @@ def format_player_info(data, uid):
             account_age = f"✿ {days//365} سنة"
 
     text = f"""
-╭━━━〔 ✿ ياسين TX ✿ 〕━━━╮
+╭━━━〔 ✿ YACINE TX ✿ 〕━━━╮
 ┃
-┃  ⌬ بوت معلومات فري فاير
+┃  ⌬ FREE FIRE INFORMATION BOT
 ┃  
 ┃  ✪ *معلومات اللاعب*
 ┃
@@ -83,23 +83,23 @@ def format_player_info(data, uid):
 ┃
 ┃  ✪ *الرتب*
 ┃
-┃  ⌬ *رتبة باتل رويال:* `{basic.get('rank', '✿ غير معروف')} ({br_rank})`
-┃  ✿ *نقاط باتل رويال:* `{basic.get('rankingPoints', 0):,}`
-┃  ⌘ *أعلى رتبة باتل رويال:* `{basic.get('maxRank', '✿ غير معروف')}`
-┃  ⌬ *رتبة كلايش سكوا:* `{basic.get('csRank', '✿ غير معروف')} ({cs_rank})`
-┃  ✪ *نقاط كلايش سكوا:* `{basic.get('csRankingPoints', 0):,}`
-┃  ✿ *أعلى رتبة كلايش سكوا:* `{basic.get('csMaxRank', '✿ غير معروف')}`
+┃  ⌬ *رتبة BR:* `{basic.get('rank', '✿ غير معروف')} ({br_rank})`
+┃  ✿ *نقاط BR:* `{basic.get('rankingPoints', 0):,}`
+┃  ⌘ *أعلى رتبة BR:* `{basic.get('maxRank', '✿ غير معروف')}`
+┃  ⌬ *رتبة CS:* `{basic.get('csRank', '✿ غير معروف')} ({cs_rank})`
+┃  ✪ *نقاط CS:* `{basic.get('csRankingPoints', 0):,}`
+┃  ✿ *أعلى رتبة CS:* `{basic.get('csMaxRank', '✿ غير معروف')}`
 ┃
 ┃  ━━━━━━━━━━━━━━━━━━━━
 ┃
 ┃  ⌘ *الملف الشخصي*
 ┃
-┃  ⌬ *صورة الملف:* `{basic.get('headPic', '✿ غير معروف')}`
+┃  ⌬ *معرض الصورة:* `{basic.get('headPic', '✿ غير معروف')}`
 ┃  ✪ *الشارة:* `{basic.get('badgeId', '✿ غير معروف')}`
-┃  ✿ *اللقب:* `{basic.get('title', '✿ غير معروف')}`
+┃  ✿ *العنوان:* `{basic.get('title', '✿ غير معروف')}`
 ┃  ⌘ *الدبوس:* `{basic.get('pinId', '✿ غير معروف')}`
 ┃  ⌬ *الموسم:* `{basic.get('seasonId', '✿ غير معروف')}`
-┃  ✪ *نجمة مميزة:* `{'⌘ نعم ⌘' if profile.get('isMarkedStar') else '⌘ لا ⌘'}`
+┃  ✪ *علامة مميزة:* `{'⌘ نعم ⌘' if profile.get('isMarkedStar') else '⌘ لا ⌘'}`
 ┃  ✿ *سلاح PVE:* `{profile.get('pvePrimaryWeapon', '✿ غير معروف')}`
 ┃  ⌘ *تاريخ الانتهاء:* `{convert_time(profile.get('endTime'))}`
 ┃  ⌬ *المهارات:* `{', '.join(map(str, skills)) if skills else '✿ لا يوجد'}`
@@ -131,7 +131,7 @@ def format_player_info(data, uid):
 ┃
 ┃  ━━━━━━━━━━━━━━━━━━━━
 ┃
-┃  ⌬ *تواصل اجتماعي*
+┃  ⌬ *اجتماعي*
 ┃
 ┃  ✪ *اللغة:* `{social.get('language', 'EN').replace('Language_', '')}`
 ┃  ✿ *وقت النشاط:* `{social.get('timeActive', 'DAY').replace('TimeActive_', '')}`
@@ -155,7 +155,7 @@ def format_player_info(data, uid):
 ┃
 ┃  ━━━━━━━━━━━━━━━━━━━━
 ┃
-┃  ⌘ *المطور:* `ياسين X6`
+┃  ⌘ *المطور:* `YACINE_X6`
 ┃  ⌬ *البوت:* `@Yacine_X6_Bot`
 ┃
 ┃  ✪ *جميع الحقوق محفوظة ©*
@@ -163,17 +163,17 @@ def format_player_info(data, uid):
 """
     return text
 
-# ================= أمر البدء =================
+# ================= START =================
 @bot.message_handler(commands=['start'])
 def start_command(message):
     try:
         welcome_text = f"""
-╭━━━〔 ✿ ياسين TX ✿ 〕━━━╮
+╭━━━〔 ✿ YACINE TX ✿ 〕━━━╮
 ┃
-┃  ⌬ بوت معلومات فري فاير
+┃  ⌬ FREE FIRE INFORMATION BOT
 ┃  
 ┃  ✪ البوت الأكثر تطوراً للحصول على
-┃  معلومات لاعبي فري فاير بكل دقة
+┃  معلومات لاعبي Free Fire بكل دقة
 ┃  وسرعة.
 ┃
 ┃  ━━━━━━━━━━━━━━━━━━━━
@@ -190,10 +190,10 @@ def start_command(message):
 ┃
 ┃  ⌬ *الأوامر*
 ┃
-┃  /info <المعرف>
+┃  /info <UID>
 ┃  ✿ معلومات اللاعب.
 ┃
-┃  /outfit <المعرف>
+┃  /outfit <UID>
 ┃  ⌘ صورة الأوتفيت.
 ┃
 ┃  /help
@@ -210,7 +210,7 @@ def start_command(message):
 ┃
 ┃  ━━━━━━━━━━━━━━━━━━━━
 ┃
-┃  👨‍💻 *المطور:* `ياسين X6`
+┃  👨‍💻 *المطور:* `YACINE_X6`
 ┃  ⌬ جميع الحقوق محفوظة
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━╯
 """
@@ -234,11 +234,11 @@ def start_command(message):
         logging.error(f"✿ خطأ في أمر البدء: {e}")
         bot.reply_to(message, "❌ *حدث خطأ، يرجى المحاولة لاحقاً.*", parse_mode='Markdown')
 
-# ================= أمر المساعدة =================
+# ================= HELP =================
 @bot.message_handler(commands=['help'])
 def help_command(message):
     text = """
-╭━━━〔 ✿ ياسين TX ✿ 〕━━━╮
+╭━━━〔 ✿ YACINE TX ✿ 〕━━━╮
 ┃
 ┃  ⌬ *دليل الأوامر*
 ┃
@@ -246,8 +246,8 @@ def help_command(message):
 ┃
 ┃  ⌬ *الأوامر المتاحة:*
 ┃
-┃  /info <المعرف> ✿ معلومات اللاعب
-┃  /outfit <المعرف> ⌘ صورة الأوتفيت
+┃  /info <UID> ✿ معلومات اللاعب
+┃  /outfit <UID> ⌘ صورة الأوتفيت
 ┃  /start ✪ الصفحة الرئيسية
 ┃  /help ⌬ عرض هذه القائمة
 ┃
@@ -259,13 +259,13 @@ def help_command(message):
 ┃
 ┃  ━━━━━━━━━━━━━━━━━━━━
 ┃
-┃  👨‍💻 *المطور:* `ياسين X6`
+┃  👨‍💻 *المطور:* `YACINE_X6`
 ┃  ⌬ جميع الحقوق محفوظة
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━╯
 """
     bot.reply_to(message, text, parse_mode='Markdown')
 
-# ================= أمر المعلومات =================
+# ================= INFO =================
 @bot.message_handler(commands=['info'])
 def info_command(message):
     parts = message.text.split()
@@ -317,7 +317,7 @@ def info_command(message):
         logging.error(f"✿ خطأ في أمر المعلومات: {e}")
         bot.edit_message_text(f"❌ *خطأ: {str(e)}*", message.chat.id, processing.message_id, parse_mode='Markdown')
 
-# ================= أمر الأوتفيت =================
+# ================= OUTFIT =================
 @bot.message_handler(commands=['outfit'])
 def outfit_command(message):
     parts = message.text.split()
@@ -356,11 +356,11 @@ def outfit_command(message):
         logging.error(f"✿ خطأ في أمر الأوتفيت: {e}")
         bot.edit_message_text(f"❌ *خطأ: {str(e)}*", message.chat.id, processing.message_id, parse_mode='Markdown')
 
-# ================= التشغيل الرئيسي =================
+# ================= MAIN =================
 if __name__ == "__main__":
     print("=" * 50)
-    print("✿ بوت ياسين X6 للمعلومات")
-    print("⌘ المطور: ياسين X6")
+    print("✿ بوت YACINE_X6 للمعلومات")
+    print("⌘ المطور: YACINE_X6")
     print("⌬ جميع الحقوق محفوظة")
     print("✪ يعمل الآن...")
     print("=" * 50)

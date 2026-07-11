@@ -5,31 +5,31 @@ from io import BytesIO
 import logging
 import os
 
-# ================= TOKEN =================
+# ================= التوكن =================
 BOT_TOKEN = "7792196548:AAHaWkIJXqnWxj51IJm0SI4_DWDpiMOCfiU"
 bot = telebot.TeleBot(BOT_TOKEN)
 
-# ========= API LINKS =========
+# ========= روابط الـ API =========
 INFO_API = "https://nirob-x-info.vercel.app/info?uid={uid}"
 OUTFIT_API = "https://nirob-free-fire-outfit.vercel.app/get?uid={uid}"
 WELCOME_IMAGE = "https://freeimage.host/i/C07A0Cu"
 
-# ========= LOGGING =========
+# ========= إعدادات التسجيل =========
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# ========= CONVERT TIME =========
+# ========= دالة تحويل الوقت =========
 def convert_time(timestamp):
     try:
         if not timestamp:
-            return "✿ غير موجود"
+            return "<blockquote>✿ غير موجود</blockquote>"
         ts = int(str(timestamp).strip())
         if ts > 1000000000000:
             ts = ts / 1000
-        return datetime.fromtimestamp(ts).strftime("%Y-%m-%d %H:%M:%S")
+        return datetime.fromtimestamp(ts).strftime("<blockquote>%Y-%m-%d %H:%M:%S</blockquote>")
     except:
-        return "✿ غير موجود"
+        return "<blockquote>✿ غير موجود</blockquote>"
 
-# ========= FORMAT PLAYER INFO =========
+# ========= تنسيق معلومات اللاعب =========
 def format_player_info(data, uid):
     basic = data.get("basicInfo", {})
     profile = data.get("profileInfo", {})
@@ -60,159 +60,159 @@ def format_player_info(data, uid):
             account_age = f"✿ {days//365} سنة"
 
     text = f"""
-╭━━━〔 ✿ YACINE TX ✿ 〕━━━╮
-┃
-┃  ⌬ FREE FIRE INFORMATION BOT
-┃  
-┃  ✪ *معلومات اللاعب*
-┃
-┃  ━━━━━━━━━━━━━━━━━━━━
-┃
-┃  ✿ *الاسم:* `{basic.get('nickname', '✿ غير معروف')}`
-┃  ⌘ *المعرف (UID):* `{uid}`
-┃  ⌬ *المنطقة:* `{basic.get('region', '✿ غير معروف')}`
-┃  ✪ *نوع الحساب:* `{'⌘ عادي ⌘' if basic.get('accountType') == 1 else '⌘ زائر ⌘'}`
-┃  ✿ *المستوى:* `{basic.get('level', '✿ غير معروف')}`
-┃  ⌘ *الخبرة:* `{basic.get('exp', 0):,}`
-┃  ⌬ *الإعجابات:* `{basic.get('liked', 0):,}`
-┃  ✪ *عمر الحساب:* `{account_age}`
-┃  ✿ *الإصدار:* `{basic.get('releaseVersion', 'OB')}`
-┃  ⌘ *تاريخ الإنشاء:* `{convert_time(basic.get('createAt'))}`
-┃
-┃  ━━━━━━━━━━━━━━━━━━━━
-┃
-┃  ✪ *الرتب*
-┃
-┃  ⌬ *رتبة BR:* `{basic.get('rank', '✿ غير معروف')} ({br_rank})`
-┃  ✿ *نقاط BR:* `{basic.get('rankingPoints', 0):,}`
-┃  ⌘ *أعلى رتبة BR:* `{basic.get('maxRank', '✿ غير معروف')}`
-┃  ⌬ *رتبة CS:* `{basic.get('csRank', '✿ غير معروف')} ({cs_rank})`
-┃  ✪ *نقاط CS:* `{basic.get('csRankingPoints', 0):,}`
-┃  ✿ *أعلى رتبة CS:* `{basic.get('csMaxRank', '✿ غير معروف')}`
-┃
-┃  ━━━━━━━━━━━━━━━━━━━━
-┃
-┃  ⌘ *الملف الشخصي*
-┃
-┃  ⌬ *معرض الصورة:* `{basic.get('headPic', '✿ غير معروف')}`
-┃  ✪ *الشارة:* `{basic.get('badgeId', '✿ غير معروف')}`
-┃  ✿ *العنوان:* `{basic.get('title', '✿ غير معروف')}`
-┃  ⌘ *الدبوس:* `{basic.get('pinId', '✿ غير معروف')}`
-┃  ⌬ *الموسم:* `{basic.get('seasonId', '✿ غير معروف')}`
-┃  ✪ *علامة مميزة:* `{'⌘ نعم ⌘' if profile.get('isMarkedStar') else '⌘ لا ⌘'}`
-┃  ✿ *سلاح PVE:* `{profile.get('pvePrimaryWeapon', '✿ غير معروف')}`
-┃  ⌘ *تاريخ الانتهاء:* `{convert_time(profile.get('endTime'))}`
-┃  ⌬ *المهارات:* `{', '.join(map(str, skills)) if skills else '✿ لا يوجد'}`
-┃  ✪ *الأسلحة:* `{', '.join(map(str, weapons)) if weapons else '✿ لا يوجد'}`
-┃  ✿ *الملابس:* `{', '.join(map(str, clothes)) if clothes else '✿ لا يوجد'}`
-┃
-┃  ━━━━━━━━━━━━━━━━━━━━
-┃
-┃  ⌬ *النادي*
-┃
-┃  ✪ *اسم النادي:* `{clan.get('clanName', '✿ لا يوجد نادي')}`
-┃  ✿ *معرف النادي:* `{clan.get('clanId', '✿ غير معروف')}`
-┃  ⌘ *مستوى النادي:* `{clan.get('clanLevel', '✿ غير معروف')}`
-┃  ⌬ *الأعضاء:* `{clan.get('memberNum', 0)} / {clan.get('capacity', 0)}`
-┃  ✪ *الكابتن:* `{captain.get('nickname', '✿ غير معروف')}`
-┃  ✿ *مستوى الكابتن:* `{captain.get('level', '✿ غير معروف')}`
-┃  ⌘ *إعجابات الكابتن:* `{captain.get('liked', 0):,}`
-┃
-┃  ━━━━━━━━━━━━━━━━━━━━
-┃
-┃  ⌬ *الحيوان الأليف*
-┃
-┃  ✪ *معرف الحيوان:* `{pet.get('id', '✿ غير معروف')}`
-┃  ✿ *المستوى:* `{pet.get('level', '✿ غير معروف')}`
-┃  ⌘ *الخبرة:* `{pet.get('exp', 0)}`
-┃  ⌬ *الجلد:* `{pet.get('skinId', '✿ غير معروف')}`
-┃  ✪ *المهارة:* `{pet.get('selectedSkillId', '✿ غير معروف')}`
-┃  ✿ *مختار:* `{'⌘ نعم ⌘' if pet.get('isSelected') else '⌘ لا ⌘'}`
-┃
-┃  ━━━━━━━━━━━━━━━━━━━━
-┃
-┃  ⌬ *اجتماعي*
-┃
-┃  ✪ *اللغة:* `{social.get('language', 'EN').replace('Language_', '')}`
-┃  ✿ *وقت النشاط:* `{social.get('timeActive', 'DAY').replace('TimeActive_', '')}`
-┃  ⌘ *التوقيع:* `{social.get('signature', '✿ لا يوجد توقيع')}`
-┃  ⌬ *الرتبة الظاهرة:* `{social.get('rankShow', 'BR').replace('RankShow_', '')}`
-┃
-┃  ━━━━━━━━━━━━━━━━━━━━
-┃
-┃  ✪ *الحساب*
-┃
-┃  ✿ *درجة الائتمان:* `{credit.get('creditScore', '100')}/100`
-┃  ⌘ *تكلفة الماس:* `{diamond.get('diamondCost', '✿ غير معروف')} 💎`
-┃  ⌬ *تاريخ الانتهاء:* `{convert_time(credit.get('periodicSummaryEndTime'))}`
-┃
-┃  ━━━━━━━━━━━━━━━━━━━━
-┃
-┃  ⌬ *الجدول الزمني*
-┃
-┃  ✪ *تاريخ الإنشاء:* `{convert_time(basic.get('createAt'))}`
-┃  ✿ *آخر تسجيل دخول:* `{convert_time(basic.get('lastLoginAt'))}`
-┃
-┃  ━━━━━━━━━━━━━━━━━━━━
-┃
-┃  ⌘ *المطور:* `YACINE_X6`
-┃  ⌬ *البوت:* `@Yacine_X6_Bot`
-┃
-┃  ✪ *جميع الحقوق محفوظة ©*
-╰━━━━━━━━━━━━━━━━━━━━━━━━━╯
+<blockquote>╭━━━〔 ✿ ياسين TX ✿ 〕━━━╮</blockquote>
+<blockquote>┃</blockquote>
+<blockquote>┃  ⌬ بوت معلومات فري فاير</blockquote>
+<blockquote>┃  </blockquote>
+<blockquote>┃  ✪ *معلومات اللاعب*</blockquote>
+<blockquote>┃</blockquote>
+<blockquote>┃  ━━━━━━━━━━━━━━━━━━━━</blockquote>
+<blockquote>┃</blockquote>
+<blockquote>┃  ✿ *الاسم:* `{basic.get('nickname', '✿ غير معروف')}`</blockquote>
+<blockquote>┃  ⌘ *المعرف (UID):* `{uid}`</blockquote>
+<blockquote>┃  ⌬ *المنطقة:* `{basic.get('region', '✿ غير معروف')}`</blockquote>
+<blockquote>┃  ✪ *نوع الحساب:* `{'⌘ عادي ⌘' if basic.get('accountType') == 1 else '⌘ زائر ⌘'}`</blockquote>
+<blockquote>┃  ✿ *المستوى:* `{basic.get('level', '✿ غير معروف')}`</blockquote>
+<blockquote>┃  ⌘ *الخبرة:* `{basic.get('exp', 0):,}`</blockquote>
+<blockquote>┃  ⌬ *الإعجابات:* `{basic.get('liked', 0):,}`</blockquote>
+<blockquote>┃  ✪ *عمر الحساب:* `{account_age}`</blockquote>
+<blockquote>┃  ✿ *الإصدار:* `{basic.get('releaseVersion', 'OB')}`</blockquote>
+<blockquote>┃  ⌘ *تاريخ الإنشاء:* `{convert_time(basic.get('createAt'))}`</blockquote>
+<blockquote>┃</blockquote>
+<blockquote>┃  ━━━━━━━━━━━━━━━━━━━━</blockquote>
+<blockquote>┃</blockquote>
+<blockquote>┃  ✪ *الرتب*</blockquote>
+<blockquote>┃</blockquote>
+<blockquote>┃  ⌬ *رتبة باتل رويال:* `{basic.get('rank', '✿ غير معروف')} ({br_rank})`</blockquote>
+<blockquote>┃  ✿ *نقاط باتل رويال:* `{basic.get('rankingPoints', 0):,}`</blockquote>
+<blockquote>┃  ⌘ *أعلى رتبة باتل رويال:* `{basic.get('maxRank', '✿ غير معروف')}`</blockquote>
+<blockquote>┃  ⌬ *رتبة كلايش سكوا:* `{basic.get('csRank', '✿ غير معروف')} ({cs_rank})`</blockquote>
+<blockquote>┃  ✪ *نقاط كلايش سكوا:* `{basic.get('csRankingPoints', 0):,}`</blockquote>
+<blockquote>┃  ✿ *أعلى رتبة كلايش سكوا:* `{basic.get('csMaxRank', '✿ غير معروف')}`</blockquote>
+<blockquote>┃</blockquote>
+<blockquote>┃  ━━━━━━━━━━━━━━━━━━━━</blockquote>
+<blockquote>┃</blockquote>
+<blockquote>┃  ⌘ *الملف الشخصي*</blockquote>
+<blockquote>┃</blockquote>
+<blockquote>┃  ⌬ *صورة الملف:* `{basic.get('headPic', '✿ غير معروف')}`</blockquote>
+<blockquote>┃  ✪ *الشارة:* `{basic.get('badgeId', '✿ غير معروف')}`</blockquote>
+<blockquote>┃  ✿ *اللقب:* `{basic.get('title', '✿ غير معروف')}`</blockquote>
+<blockquote>┃  ⌘ *الدبوس:* `{basic.get('pinId', '✿ غير معروف')}`</blockquote>
+<blockquote>┃  ⌬ *الموسم:* `{basic.get('seasonId', '✿ غير معروف')}`</blockquote>
+<blockquote>┃  ✪ *نجمة مميزة:* `{'⌘ نعم ⌘' if profile.get('isMarkedStar') else '⌘ لا ⌘'}`</blockquote>
+<blockquote>┃  ✿ *سلاح PVE:* `{profile.get('pvePrimaryWeapon', '✿ غير معروف')}`</blockquote>
+<blockquote>┃  ⌘ *تاريخ الانتهاء:* `{convert_time(profile.get('endTime'))}`</blockquote>
+<blockquote>┃  ⌬ *المهارات:* `{', '.join(map(str, skills)) if skills else '✿ لا يوجد'}`</blockquote>
+<blockquote>┃  ✪ *الأسلحة:* `{', '.join(map(str, weapons)) if weapons else '✿ لا يوجد'}`</blockquote>
+<blockquote>┃  ✿ *الملابس:* `{', '.join(map(str, clothes)) if clothes else '✿ لا يوجد'}`</blockquote>
+<blockquote>┃</blockquote>
+<blockquote>┃  ━━━━━━━━━━━━━━━━━━━━</blockquote>
+<blockquote>┃</blockquote>
+<blockquote>┃  ⌬ *النادي*</blockquote>
+<blockquote>┃</blockquote>
+<blockquote>┃  ✪ *اسم النادي:* `{clan.get('clanName', '✿ لا يوجد نادي')}`</blockquote>
+<blockquote>┃  ✿ *معرف النادي:* `{clan.get('clanId', '✿ غير معروف')}`</blockquote>
+<blockquote>┃  ⌘ *مستوى النادي:* `{clan.get('clanLevel', '✿ غير معروف')}`</blockquote>
+<blockquote>┃  ⌬ *الأعضاء:* `{clan.get('memberNum', 0)} / {clan.get('capacity', 0)}`</blockquote>
+<blockquote>┃  ✪ *الكابتن:* `{captain.get('nickname', '✿ غير معروف')}`</blockquote>
+<blockquote>┃  ✿ *مستوى الكابتن:* `{captain.get('level', '✿ غير معروف')}`</blockquote>
+<blockquote>┃  ⌘ *إعجابات الكابتن:* `{captain.get('liked', 0):,}`</blockquote>
+<blockquote>┃</blockquote>
+<blockquote>┃  ━━━━━━━━━━━━━━━━━━━━</blockquote>
+<blockquote>┃</blockquote>
+<blockquote>┃  ⌬ *الحيوان الأليف*</blockquote>
+<blockquote>┃</blockquote>
+<blockquote>┃  ✪ *معرف الحيوان:* `{pet.get('id', '✿ غير معروف')}`</blockquote>
+<blockquote>┃  ✿ *المستوى:* `{pet.get('level', '✿ غير معروف')}`</blockquote>
+<blockquote>┃  ⌘ *الخبرة:* `{pet.get('exp', 0)}`</blockquote>
+<blockquote>┃  ⌬ *الجلد:* `{pet.get('skinId', '✿ غير معروف')}`</blockquote>
+<blockquote>┃  ✪ *المهارة:* `{pet.get('selectedSkillId', '✿ غير معروف')}`</blockquote>
+<blockquote>┃  ✿ *مختار:* `{'⌘ نعم ⌘' if pet.get('isSelected') else '⌘ لا ⌘'}`</blockquote>
+<blockquote>┃</blockquote>
+<blockquote>┃  ━━━━━━━━━━━━━━━━━━━━</blockquote>
+<blockquote>┃</blockquote>
+<blockquote>┃  ⌬ *تواصل اجتماعي*</blockquote>
+<blockquote>┃</blockquote>
+<blockquote>┃  ✪ *اللغة:* `{social.get('language', 'EN').replace('Language_', '')}`</blockquote>
+<blockquote>┃  ✿ *وقت النشاط:* `{social.get('timeActive', 'DAY').replace('TimeActive_', '')}`</blockquote>
+<blockquote>┃  ⌘ *التوقيع:* `{social.get('signature', '✿ لا يوجد توقيع')}`</blockquote>
+<blockquote>┃  ⌬ *الرتبة الظاهرة:* `{social.get('rankShow', 'BR').replace('RankShow_', '')}`</blockquote>
+<blockquote>┃</blockquote>
+<blockquote>┃  ━━━━━━━━━━━━━━━━━━━━</blockquote>
+<blockquote>┃</blockquote>
+<blockquote>┃  ✪ *الحساب*</blockquote>
+<blockquote>┃</blockquote>
+<blockquote>┃  ✿ *درجة الائتمان:* `{credit.get('creditScore', '100')}/100`</blockquote>
+<blockquote>┃  ⌘ *تكلفة الماس:* `{diamond.get('diamondCost', '✿ غير معروف')} 💎`</blockquote>
+<blockquote>┃  ⌬ *تاريخ الانتهاء:* `{convert_time(credit.get('periodicSummaryEndTime'))}`</blockquote>
+<blockquote>┃</blockquote>
+<blockquote>┃  ━━━━━━━━━━━━━━━━━━━━</blockquote>
+<blockquote>┃</blockquote>
+<blockquote>┃  ⌬ *الجدول الزمني*</blockquote>
+<blockquote>┃</blockquote>
+<blockquote>┃  ✪ *تاريخ الإنشاء:* `{convert_time(basic.get('createAt'))}`</blockquote>
+<blockquote>┃  ✿ *آخر تسجيل دخول:* `{convert_time(basic.get('lastLoginAt'))}`</blockquote>
+<blockquote>┃</blockquote>
+<blockquote>┃  ━━━━━━━━━━━━━━━━━━━━</blockquote>
+<blockquote>┃</blockquote>
+<blockquote>┃  ⌘ *المطور:* `ياسين X6`</blockquote>
+<blockquote>┃  ⌬ *البوت:* `@Yacine_X6_Bot`</blockquote>
+<blockquote>┃</blockquote>
+<blockquote>┃  ✪ *جميع الحقوق محفوظة ©*</blockquote>
+<blockquote>╰━━━━━━━━━━━━━━━━━━━━━━━━━╯</blockquote>
 """
     return text
 
-# ================= START =================
+# ================= أمر البدء =================
 @bot.message_handler(commands=['start'])
 def start_command(message):
     try:
         welcome_text = f"""
-╭━━━〔 ✿ YACINE TX ✿ 〕━━━╮
-┃
-┃  ⌬ FREE FIRE INFORMATION BOT
-┃  
-┃  ✪ البوت الأكثر تطوراً للحصول على
-┃  معلومات لاعبي Free Fire بكل دقة
-┃  وسرعة.
-┃
-┃  ━━━━━━━━━━━━━━━━━━━━
-┃
-┃  ⌬ *الخدمات*
-┃
-┃  ✿ معلومات الحساب.
-┃  ⌘ صورة الأوتفيت.
-┃  ⌬ رتبة اللاعب.
-┃  ✪ إحصائيات متقدمة.
-┃  ✿ واجهة احترافية.
-┃
-┃  ━━━━━━━━━━━━━━━━━━━━
-┃
-┃  ⌬ *الأوامر*
-┃
-┃  /info <UID>
-┃  ✿ معلومات اللاعب.
-┃
-┃  /outfit <UID>
-┃  ⌘ صورة الأوتفيت.
-┃
-┃  /help
-┃  ⌬ جميع الأوامر.
-┃
-┃  /start
-┃  ✪ الصفحة الرئيسية.
-┃
-┃  ━━━━━━━━━━━━━━━━━━━━
-┃
-┃  ✿ *مثال*
-┃
-┃  /info 9097982134
-┃
-┃  ━━━━━━━━━━━━━━━━━━━━
-┃
-┃  👨‍💻 *المطور:* `YACINE_X6`
-┃  ⌬ جميع الحقوق محفوظة
-╰━━━━━━━━━━━━━━━━━━━━━━━━━╯
+<blockquote>╭━━━〔 ✿ ياسين TX ✿ 〕━━━╮</blockquote>
+<blockquote>┃</blockquote>
+<blockquote>┃  ⌬ بوت معلومات فري فاير</blockquote>
+<blockquote>┃  </blockquote>
+<blockquote>┃  ✪ البوت الأكثر تطوراً للحصول على</blockquote>
+<blockquote>┃  معلومات لاعبي فري فاير بكل دقة</blockquote>
+<blockquote>┃  وسرعة.</blockquote>
+<blockquote>┃</blockquote>
+<blockquote>┃  ━━━━━━━━━━━━━━━━━━━━</blockquote>
+<blockquote>┃</blockquote>
+<blockquote>┃  ⌬ *الخدمات*</blockquote>
+<blockquote>┃</blockquote>
+<blockquote>┃  ✿ معلومات الحساب.</blockquote>
+<blockquote>┃  ⌘ صورة الأوتفيت.</blockquote>
+<blockquote>┃  ⌬ رتبة اللاعب.</blockquote>
+<blockquote>┃  ✪ إحصائيات متقدمة.</blockquote>
+<blockquote>┃  ✿ واجهة احترافية.</blockquote>
+<blockquote>┃</blockquote>
+<blockquote>┃  ━━━━━━━━━━━━━━━━━━━━</blockquote>
+<blockquote>┃</blockquote>
+<blockquote>┃  ⌬ *الأوامر*</blockquote>
+<blockquote>┃</blockquote>
+<blockquote>┃  /info <المعرف></blockquote>
+<blockquote>┃  ✿ معلومات اللاعب.</blockquote>
+<blockquote>┃</blockquote>
+<blockquote>┃  /outfit <المعرف></blockquote>
+<blockquote>┃  ⌘ صورة الأوتفيت.</blockquote>
+<blockquote>┃</blockquote>
+<blockquote>┃  /help</blockquote>
+<blockquote>┃  ⌬ جميع الأوامر.</blockquote>
+<blockquote>┃</blockquote>
+<blockquote>┃  /start</blockquote>
+<blockquote>┃  ✪ الصفحة الرئيسية.</blockquote>
+<blockquote>┃</blockquote>
+<blockquote>┃  ━━━━━━━━━━━━━━━━━━━━</blockquote>
+<blockquote>┃</blockquote>
+<blockquote>┃  ✿ *مثال*</blockquote>
+<blockquote>┃</blockquote>
+<blockquote>┃  /info 9097982134</blockquote>
+<blockquote>┃</blockquote>
+<blockquote>┃  ━━━━━━━━━━━━━━━━━━━━</blockquote>
+<blockquote>┃</blockquote>
+<blockquote>┃  👨‍💻 *المطور:* `ياسين X6`</blockquote>
+<blockquote>┃  ⌬ جميع الحقوق محفوظة</blockquote>
+<blockquote>╰━━━━━━━━━━━━━━━━━━━━━━━━━╯</blockquote>
 """
         try:
             image_response = requests.get(WELCOME_IMAGE, timeout=15)
@@ -223,81 +223,81 @@ def start_command(message):
                     message.chat.id,
                     photo,
                     caption=welcome_text,
-                    parse_mode='Markdown'
+                    parse_mode='HTML'
                 )
             else:
-                bot.reply_to(message, welcome_text, parse_mode='Markdown')
+                bot.reply_to(message, welcome_text, parse_mode='HTML')
         except:
-            bot.reply_to(message, welcome_text, parse_mode='Markdown')
+            bot.reply_to(message, welcome_text, parse_mode='HTML')
             
     except Exception as e:
         logging.error(f"✿ خطأ في أمر البدء: {e}")
-        bot.reply_to(message, "❌ *حدث خطأ، يرجى المحاولة لاحقاً.*", parse_mode='Markdown')
+        bot.reply_to(message, "<blockquote>❌ حدث خطأ، يرجى المحاولة لاحقاً.</blockquote>", parse_mode='HTML')
 
-# ================= HELP =================
+# ================= أمر المساعدة =================
 @bot.message_handler(commands=['help'])
 def help_command(message):
     text = """
-╭━━━〔 ✿ YACINE TX ✿ 〕━━━╮
-┃
-┃  ⌬ *دليل الأوامر*
-┃
-┃  ━━━━━━━━━━━━━━━━━━━━
-┃
-┃  ⌬ *الأوامر المتاحة:*
-┃
-┃  /info <UID> ✿ معلومات اللاعب
-┃  /outfit <UID> ⌘ صورة الأوتفيت
-┃  /start ✪ الصفحة الرئيسية
-┃  /help ⌬ عرض هذه القائمة
-┃
-┃  ━━━━━━━━━━━━━━━━━━━━
-┃
-┃  ⌘ *مثال:*
-┃
-┃  /info 9097982134
-┃
-┃  ━━━━━━━━━━━━━━━━━━━━
-┃
-┃  👨‍💻 *المطور:* `YACINE_X6`
-┃  ⌬ جميع الحقوق محفوظة
-╰━━━━━━━━━━━━━━━━━━━━━━━━━╯
+<blockquote>╭━━━〔 ✿ ياسين TX ✿ 〕━━━╮</blockquote>
+<blockquote>┃</blockquote>
+<blockquote>┃  ⌬ *دليل الأوامر*</blockquote>
+<blockquote>┃</blockquote>
+<blockquote>┃  ━━━━━━━━━━━━━━━━━━━━</blockquote>
+<blockquote>┃</blockquote>
+<blockquote>┃  ⌬ *الأوامر المتاحة:*</blockquote>
+<blockquote>┃</blockquote>
+<blockquote>┃  /info <المعرف> ✿ معلومات اللاعب</blockquote>
+<blockquote>┃  /outfit <المعرف> ⌘ صورة الأوتفيت</blockquote>
+<blockquote>┃  /start ✪ الصفحة الرئيسية</blockquote>
+<blockquote>┃  /help ⌬ عرض هذه القائمة</blockquote>
+<blockquote>┃</blockquote>
+<blockquote>┃  ━━━━━━━━━━━━━━━━━━━━</blockquote>
+<blockquote>┃</blockquote>
+<blockquote>┃  ⌘ *مثال:*</blockquote>
+<blockquote>┃</blockquote>
+<blockquote>┃  /info 9097982134</blockquote>
+<blockquote>┃</blockquote>
+<blockquote>┃  ━━━━━━━━━━━━━━━━━━━━</blockquote>
+<blockquote>┃</blockquote>
+<blockquote>┃  👨‍💻 *المطور:* `ياسين X6`</blockquote>
+<blockquote>┃  ⌬ جميع الحقوق محفوظة</blockquote>
+<blockquote>╰━━━━━━━━━━━━━━━━━━━━━━━━━╯</blockquote>
 """
-    bot.reply_to(message, text, parse_mode='Markdown')
+    bot.reply_to(message, text, parse_mode='HTML')
 
-# ================= INFO =================
+# ================= أمر المعلومات =================
 @bot.message_handler(commands=['info'])
 def info_command(message):
     parts = message.text.split()
     if len(parts) < 2:
-        bot.reply_to(message, "❌ *استخدم: /info <المعرف>*\nمثال: `/info 9097982134`", parse_mode='Markdown')
+        bot.reply_to(message, "<blockquote>❌ استخدم: /info <المعرف>\nمثال: /info 9097982134</blockquote>", parse_mode='HTML')
         return
 
     uid = parts[1].strip()
     if not uid.isdigit():
-        bot.reply_to(message, "❌ *معرف غير صحيح! يرجى إدخال أرقام فقط.*", parse_mode='Markdown')
+        bot.reply_to(message, "<blockquote>❌ معرف غير صحيح! يرجى إدخال أرقام فقط.</blockquote>", parse_mode='HTML')
         return
 
-    processing = bot.reply_to(message, f"⏳ *جاري جلب المعلومات للمعرف {uid}...*", parse_mode='Markdown')
+    processing = bot.reply_to(message, f"<blockquote>⏳ جاري جلب المعلومات للمعرف {uid}...</blockquote>", parse_mode='HTML')
 
     try:
         url = INFO_API.format(uid=uid)
         response = requests.get(url, timeout=30)
 
         if response.status_code != 200:
-            bot.edit_message_text("❌ *خطأ في الـ API! يرجى المحاولة لاحقاً.*", message.chat.id, processing.message_id, parse_mode='Markdown')
+            bot.edit_message_text("<blockquote>❌ خطأ في الـ API! يرجى المحاولة لاحقاً.</blockquote>", message.chat.id, processing.message_id, parse_mode='HTML')
             return
 
         data = response.json()
 
         if "basicInfo" not in data:
-            bot.edit_message_text("❌ *اللاعب غير موجود! يرجى التحقق من المعرف.*", message.chat.id, processing.message_id, parse_mode='Markdown')
+            bot.edit_message_text("<blockquote>❌ اللاعب غير موجود! يرجى التحقق من المعرف.</blockquote>", message.chat.id, processing.message_id, parse_mode='HTML')
             return
 
         formatted_text = format_player_info(data, uid)
 
         bot.delete_message(message.chat.id, processing.message_id)
-        bot.reply_to(message, formatted_text, parse_mode='Markdown')
+        bot.reply_to(message, formatted_text, parse_mode='HTML')
 
         outfit_url = OUTFIT_API.format(uid=uid)
         outfit_response = requests.get(outfit_url, timeout=30)
@@ -308,36 +308,36 @@ def info_command(message):
             bot.send_photo(
                 message.chat.id,
                 photo,
-                caption=f"⌬ *صورة الأوتفيت*\n🎮 {data.get('basicInfo', {}).get('nickname', 'غير معروف')} | 🆔 {uid}",
-                parse_mode='Markdown',
+                caption=f"<blockquote>⌬ صورة الأوتفيت\n🎮 {data.get('basicInfo', {}).get('nickname', 'غير معروف')} | 🆔 {uid}</blockquote>",
+                parse_mode='HTML',
                 reply_to_message_id=message.message_id
             )
 
     except Exception as e:
         logging.error(f"✿ خطأ في أمر المعلومات: {e}")
-        bot.edit_message_text(f"❌ *خطأ: {str(e)}*", message.chat.id, processing.message_id, parse_mode='Markdown')
+        bot.edit_message_text(f"<blockquote>❌ خطأ: {str(e)}</blockquote>", message.chat.id, processing.message_id, parse_mode='HTML')
 
-# ================= OUTFIT =================
+# ================= أمر الأوتفيت =================
 @bot.message_handler(commands=['outfit'])
 def outfit_command(message):
     parts = message.text.split()
     if len(parts) < 2:
-        bot.reply_to(message, "❌ *استخدم: /outfit <المعرف>*\nمثال: `/outfit 9097982134`", parse_mode='Markdown')
+        bot.reply_to(message, "<blockquote>❌ استخدم: /outfit <المعرف>\nمثال: /outfit 9097982134</blockquote>", parse_mode='HTML')
         return
 
     uid = parts[1].strip()
     if not uid.isdigit():
-        bot.reply_to(message, "❌ *معرف غير صحيح! يرجى إدخال أرقام فقط.*", parse_mode='Markdown')
+        bot.reply_to(message, "<blockquote>❌ معرف غير صحيح! يرجى إدخال أرقام فقط.</blockquote>", parse_mode='HTML')
         return
 
-    processing = bot.reply_to(message, f"⏳ *جاري تحضير صورة الأوتفيت للمعرف {uid}...*", parse_mode='Markdown')
+    processing = bot.reply_to(message, f"<blockquote>⏳ جاري تحضير صورة الأوتفيت للمعرف {uid}...</blockquote>", parse_mode='HTML')
 
     try:
         outfit_url = OUTFIT_API.format(uid=uid)
         response = requests.get(outfit_url, timeout=30)
 
         if response.status_code != 200:
-            bot.edit_message_text("❌ *صورة الأوتفيت غير متوفرة!*", message.chat.id, processing.message_id, parse_mode='Markdown')
+            bot.edit_message_text("<blockquote>❌ صورة الأوتفيت غير متوفرة!</blockquote>", message.chat.id, processing.message_id, parse_mode='HTML')
             return
 
         photo = BytesIO(response.content)
@@ -347,20 +347,20 @@ def outfit_command(message):
         bot.send_photo(
             message.chat.id,
             photo,
-            caption=f"⌬ *صورة الأوتفيت*\n🆔 المعرف: {uid}",
-            parse_mode='Markdown',
+            caption=f"<blockquote>⌬ صورة الأوتفيت\n🆔 المعرف: {uid}</blockquote>",
+            parse_mode='HTML',
             reply_to_message_id=message.message_id
         )
 
     except Exception as e:
         logging.error(f"✿ خطأ في أمر الأوتفيت: {e}")
-        bot.edit_message_text(f"❌ *خطأ: {str(e)}*", message.chat.id, processing.message_id, parse_mode='Markdown')
+        bot.edit_message_text(f"<blockquote>❌ خطأ: {str(e)}</blockquote>", message.chat.id, processing.message_id, parse_mode='HTML')
 
-# ================= MAIN =================
+# ================= التشغيل الرئيسي =================
 if __name__ == "__main__":
     print("=" * 50)
-    print("✿ بوت YACINE_X6 للمعلومات")
-    print("⌘ المطور: YACINE_X6")
+    print("✿ بوت ياسين X6 للمعلومات")
+    print("⌘ المطور: ياسين X6")
     print("⌬ جميع الحقوق محفوظة")
     print("✪ يعمل الآن...")
     print("=" * 50)

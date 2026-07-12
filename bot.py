@@ -1,6 +1,10 @@
 # ============================================================
-#  ✿ ⌘ ⌬ ✪  بوت DARK HUNTER – الإصدار النهائي  ✿ ⌘ ⌬ ✪
-#  [تم إدخال بيانات API الخاصة بك]
+#  ✿ ⌘ ⌬ ✪  بوت DARK HUNTER – كود كامل مقسم إلى 4 أجزاء  ✿ ⌘ ⌬ ✪
+#  [جميع الأجزاء في ملف واحد مع فاصل توضيحي]
+# ============================================================
+
+# ============================================================
+#  🌟 بداية الكود – الإعدادات والمكتبات 🌟
 # ============================================================
 
 import asyncio
@@ -18,6 +22,13 @@ from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 from pyrogram.enums import ChatType, ChatMemberStatus
 from pyrogram.errors import FloodWait, UserNotParticipant, ChatAdminRequired
+
+# ========== حل مشكلة event loop في Python 3.14 ==========
+if sys.platform == 'linux':
+    try:
+        asyncio.get_event_loop()
+    except RuntimeError:
+        asyncio.set_event_loop(asyncio.new_event_loop())
 
 # ================== الإعدادات (بياناتك) ==================
 API_ID = 33133213
@@ -41,6 +52,10 @@ app = Client(
     workers=20,
     parse_mode="Markdown"
 )
+
+# ============================================================
+#  🌟 الجزء الأول – قاعدة البيانات والدوال المساعدة 🌟
+# ============================================================
 
 # ================== قاعدة البيانات ==================
 DB_PATH = "dark_files.db"
@@ -189,6 +204,10 @@ def is_valid_channel_link(link):
             return True
     return False
 
+# ============================================================
+#  🌟 الجزء الثاني – دوال البحث الأساسية 🌟
+# ============================================================
+
 # ================== دالة البحث ==================
 async def search_dark_files_in_channel(channel_id, channel_link, limit=500):
     logger.info(f"⌬ بدأ البحث في القناة: {channel_link}")
@@ -251,6 +270,10 @@ async def search_all_channels(limit=500):
             logger.error(f"✿ خطأ في القناة {link}: {e}")
     
     return total_files
+
+# ============================================================
+#  🌟 الجزء الثالث – الكيبوردات والأوامر الرئيسية 🌟
+# ============================================================
 
 # ================== الكيبوردات ==================
 def main_menu_keyboard():
@@ -503,6 +526,10 @@ async def remove_channel_command(client, message):
     except Exception as e:
         await message.reply(f"❌ *خطأ:* `{str(e)}`")
 
+# ============================================================
+#  🌟 الجزء الرابع – معالجة الـ Callbacks والتشغيل 🌟
+# ============================================================
+
 # ================== معالجة الـ Callbacks ==================
 @app.on_callback_query()
 async def handle_callback(client, callback_query: CallbackQuery):
@@ -673,6 +700,10 @@ async def handle_text(client, message):
             "✿ ⌘ ⌬ ✪ *أرسل رابط قناة صحيح*\nأو استخدم الأوامر المتاحة.\n\n📌 `/help` لعرض المساعدة.",
             reply_markup=back_to_main_keyboard()
         )
+
+# ============================================================
+#  🌟 نهاية الكود – تشغيل البوت 🌟
+# ============================================================
 
 # ================== تشغيل البوت ==================
 if __name__ == "__main__":

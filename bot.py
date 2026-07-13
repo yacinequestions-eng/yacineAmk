@@ -1,722 +1,430 @@
-# ============================================================
-#  ✿ ⌘ ⌬ ✪  بوت DARK HUNTER – كود كامل مقسم إلى 4 أجزاء  ✿ ⌘ ⌬ ✪
-#  [جميع الأجزاء في ملف واحد مع فاصل توضيحي]
-# ============================================================
-
-# ============================================================
-#  🌟 بداية الكود – الإعدادات والمكتبات 🌟
-# ============================================================
-
-import asyncio
-import sqlite3
-import re
-import time
-import os
-import logging
+import requests
 import json
-import csv
-import shutil
-import sys
-from datetime import datetime
-from pyrogram import Client, filters
-from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
-from pyrogram.enums import ChatType, ChatMemberStatus
-from pyrogram.errors import FloodWait, UserNotParticipant, ChatAdminRequired
+import time
+import re
 
-# ========== حل مشكلة event loop في Python 3.14 ==========
-if sys.platform == 'linux':
+BOT_TOKEN = "8422372449:AAGZxNXJzli5pQvCJeh_rygqhAhn9dtwoPM"
+TELEGRAM_API = f"https://api.telegram.org/bot{BOT_TOKEN}"
+
+# ===================================================================
+#  إعدادات كلود
+# ===================================================================
+CLAUDE_CONFIG = {
+    "org_id": "c64dbe54-2db1-4f65-a289-6b5bccf24347",
+    "conv_id": "d7f45caa-a472-4923-a6c3-7a92079331d8",
+    "parent_uuid": "019f57ab-9b68-725a-8403-9b7c80911955",
+    "cookie": "sessionKeyLC=1783881524010; _cfuvid=_kAOrDYuOYgbAJysgEtOTvKKEUwM8ZroibQyialYWzE-1783881432.6374965-1.0.1.1-2hSW0zY.r3axCtLKKIo48XGICxDkLjftpSrrMe.EbQc; sessionKey=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; routingHint=sk-ant-rh-eyJ0eXAiOiAiSldUIiwgImFsZyI6ICJFUzI1NiIsICJraWQiOiAiN0MxcWFPRnhqdWxaUjRFQnNuNk1UeUZGNWdDV2JHbFpNVDR2RklrRFFpbyJ9.eyJzdWIiOiAiMzczYmQ1NGYtZDE1Zi00YzI4LTliMDQtNjI4NGQxYmE0ZTM2IiwgImlhdCI6IDE3ODM4ODE1MjQsICJpc3MiOiAiY2xhdWRlLWFpLXJvdXRpbmciLCAib25ib2FyZGluZ19jb21wbGV0ZSI6IHRydWUsICJwaG9uZV92ZXJpZmllZCI6IGZhbHNlLCAiYWdlX3ZlcmlmaWVkIjogdHJ1ZSwgIm5hbWUiOiAiXHUwNjQ3XHUwNjQ3XHUwNjQ3In0.ymYA2L6xaU9pfSMGf7JZWePpCbBSYUPa97AAdZHLBY-2d_EwEHVzM14ixFesalrISA1UGx_yz5-Wi-OHrEbltA; __cf_bm=0h0DR111.MiEddRHBbXAsbwiqENkfkN3n6MsTQ60HVw-1783882486.667257-1.0.1.1-.9Frfa_MsAAVnGUAz4t6zJOOS5lYkwqGUaFA29CIKUA8FjQk_RDhVKxDapaoERpLNzgCbXmzvQlapaRdzGMbqyKWJEGh5qq0zSarEpd5A2nIG4LlSIWAvO6ffKmbgLQX"
+}
+
+# ===================================================================
+#  تنقية النص من HTML غير مدعوم
+# ===================================================================
+def clean_html(text):
+    text = re.sub(r'<!DOCTYPE[^>]*>', '', text, flags=re.IGNORECASE)
+    text = re.sub(r'<html[^>]*>', '', text, flags=re.IGNORECASE)
+    text = re.sub(r'</html>', '', text, flags=re.IGNORECASE)
+    text = re.sub(r'<head[^>]*>', '', text, flags=re.IGNORECASE)
+    text = re.sub(r'</head>', '', text, flags=re.IGNORECASE)
+    text = re.sub(r'<body[^>]*>', '', text, flags=re.IGNORECASE)
+    text = re.sub(r'</body>', '', text, flags=re.IGNORECASE)
+    text = re.sub(r'<style[^>]*>.*?</style>', '', text, flags=re.DOTALL | re.IGNORECASE)
+    text = re.sub(r'<script[^>]*>.*?</script>', '', text, flags=re.DOTALL | re.IGNORECASE)
+    text = re.sub(r'<br\s*/?>', '\n', text, flags=re.IGNORECASE)
+    text = re.sub(r'<[^>]+>', '', text)
+    text = re.sub(r'\n\s*\n', '\n\n', text)
+    return text.strip()
+
+# ===================================================================
+#  دوال كلود
+# ===================================================================
+def send_to_claude(prompt, conv_id, parent_uuid):
+    url = f"https://claude.ai/api/organizations/{CLAUDE_CONFIG['org_id']}/chat_conversations/{conv_id}/completion"
+    
+    headers = {
+        "Host": "claude.ai",
+        "Accept": "text/event-stream",
+        "User-Agent": "Claude com.anthropic.claude/1.260702.10 (Android 34)",
+        "anthropic-client-platform": "android",
+        "anthropic-client-app": "com.anthropic.claude",
+        "anthropic-client-version": "1.260702.10",
+        "anthropic-client-os-version": "34",
+        "accept-language": "ar-DZ, fr-FR;q=0.9",
+        "Cookie": CLAUDE_CONFIG["cookie"],
+        "Content-Type": "application/json; charset=UTF8",
+        "Accept-Encoding": "identity",
+        "Priority": "u=1, i"
+    }
+    
+    payload = {
+        "prompt": prompt,
+        "timezone": "Africa/Algiers",
+        "model": "claude-sonnet-5",
+        "attachments": [],
+        "files": [],
+        "rendering_mode": "messages",
+        "input_mode": "text",
+        "tools": [
+            {"name": "repl", "type": "repl_v0"},
+            {"name": "web_search", "type": "web_search_v0"},
+            {"name": "user_time_v0", "title": "Check current time", "description": "Retrieves current time", "input_schema": {"type": "object", "properties": {}, "required": []}},
+        ],
+        "parent_message_uuid": parent_uuid,
+        "effort": "medium",
+        "thinking_mode": "auto"
+    }
+    
     try:
-        asyncio.get_event_loop()
-    except RuntimeError:
-        asyncio.set_event_loop(asyncio.new_event_loop())
+        response = requests.post(url, headers=headers, json=payload, stream=True, timeout=90)
+        
+        if response.status_code == 200:
+            full_response = ""
+            new_parent_uuid = parent_uuid
+            
+            for line in response.iter_lines():
+                if line:
+                    try:
+                        decoded = line.decode('utf-8', errors='ignore')
+                        
+                        if 'message_start' in decoded:
+                            try:
+                                json_str = decoded[6:].strip()
+                                if json_str:
+                                    json_data = json.loads(json_str)
+                                    if 'message' in json_data:
+                                        new_parent_uuid = json_data['message'].get('uuid', parent_uuid)
+                            except:
+                                pass
+                        
+                        if decoded.startswith('data: '):
+                            try:
+                                json_str = decoded[6:].strip()
+                                if json_str and json_str != '[DONE]':
+                                    json_data = json.loads(json_str)
+                                    if json_data.get('type') == 'content_block_delta':
+                                        delta = json_data.get('delta', {})
+                                        if delta.get('type') == 'text_delta':
+                                            full_response += delta.get('text', '')
+                            except:
+                                pass
+                    except:
+                        pass
+            
+            full_response = clean_html(full_response)
+            return full_response, new_parent_uuid
+        else:
+            return None, parent_uuid
+    except Exception as e:
+        print(f"❌ خطأ كلود: {str(e)}")
+        return None, parent_uuid
 
-# ================== الإعدادات (بياناتك) ==================
-API_ID = 33133213
-API_HASH = "3a651b67145433de258b2112c72e8d86"
-BOT_TOKEN = "7792196548:AAHaWkIJXqnWxj51IJm0SI4_DWDpiMOCfiU"
-
-# ================== إعدادات التسجيل ==================
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - ✿ %(levelname)s - ⌘ %(message)s',
-    handlers=[logging.FileHandler("dark_hunter.log"), logging.StreamHandler()]
-)
-logger = logging.getLogger(__name__)
-
-# ================== إنشاء العميل ==================
-app = Client(
-    "dark_hunter_bot",
-    api_id=API_ID,
-    api_hash=API_HASH,
-    bot_token=BOT_TOKEN,
-    workers=20,
-    parse_mode="Markdown"
-)
-
-# ============================================================
-#  🌟 الجزء الأول – قاعدة البيانات والدوال المساعدة 🌟
-# ============================================================
-
-# ================== قاعدة البيانات ==================
-DB_PATH = "dark_files.db"
-
-def init_db():
-    conn = sqlite3.connect(DB_PATH, check_same_thread=False)
-    c = conn.cursor()
+# ===================================================================
+#  إرسال رسالة مع اقتباس وتغليض HTML
+# ===================================================================
+def send_message(chat_id, text, buttons=None, parse_mode="HTML"):
+    if '<!DOCTYPE' in text or '<html' in text.lower():
+        parse_mode = None
     
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS channels (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            link TEXT UNIQUE,
-            title TEXT,
-            added_at INTEGER,
-            status TEXT DEFAULT 'active'
-        )
-    ''')
+    payload = {
+        "chat_id": chat_id,
+        "text": text
+    }
     
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS files (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            channel_id INTEGER,
-            file_name TEXT,
-            file_id TEXT,
-            file_size INTEGER,
-            mime_type TEXT,
-            message_id INTEGER,
-            date INTEGER,
-            downloaded INTEGER DEFAULT 0,
-            FOREIGN KEY(channel_id) REFERENCES channels(id)
-        )
-    ''')
+    if parse_mode:
+        payload["parse_mode"] = parse_mode
     
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS stats (
-            key TEXT PRIMARY KEY,
-            value TEXT
-        )
-    ''')
+    if buttons:
+        payload["reply_markup"] = json.dumps(buttons)
     
-    conn.commit()
-    conn.close()
-    logger.info("⌬ تم تهيئة قاعدة البيانات بنجاح")
-
-init_db()
-
-# ================== دوال مساعدة ==================
-def get_db_connection():
-    return sqlite3.connect(DB_PATH, check_same_thread=False)
-
-def add_channel(link, title):
-    conn = get_db_connection()
-    c = conn.cursor()
     try:
-        c.execute("INSERT INTO channels (link, title, added_at, status) VALUES (?, ?, ?, ?)",
-                  (link, title, int(time.time()), 'active'))
-        conn.commit()
-        return c.lastrowid
-    except sqlite3.IntegrityError:
+        response = requests.post(f"{TELEGRAM_API}/sendMessage", json=payload, timeout=30)
+        result = response.json()
+        if not result.get("ok"):
+            if parse_mode:
+                payload.pop("parse_mode", None)
+                response = requests.post(f"{TELEGRAM_API}/sendMessage", json=payload, timeout=30)
+                return response.json()
+        return result
+    except Exception as e:
+        print(f"❌ خطأ: {str(e)}")
         return None
-    finally:
-        conn.close()
 
-def add_file(channel_id, file_name, file_id, file_size, mime_type, message_id, date):
-    conn = get_db_connection()
-    c = conn.cursor()
-    c.execute('''
-        INSERT INTO files (channel_id, file_name, file_id, file_size, mime_type, message_id, date)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-    ''', (channel_id, file_name, file_id, file_size, mime_type, message_id, date))
-    conn.commit()
-    conn.close()
+# ===================================================================
+#  🔥 زر DEV واحد أحمر (danger)
+# ===================================================================
+def get_buttons():
+    return {
+        "inline_keyboard": [
+            [
+                {"text": "𝗬𝗔𝗖𝗜𝗡𝗘 𝗗𝗭", "callback_data": "dev", "style": "danger"}
+            ]
+        ]
+    }
 
-def get_channels():
-    conn = get_db_connection()
-    c = conn.cursor()
-    c.execute("SELECT id, link, title FROM channels WHERE status = 'active'")
-    result = c.fetchall()
-    conn.close()
-    return result
-
-def get_all_files():
-    conn = get_db_connection()
-    c = conn.cursor()
-    c.execute("SELECT f.id, f.file_name, f.file_id, f.file_size, f.date, c.title FROM files f JOIN channels c ON f.channel_id = c.id ORDER BY f.date DESC")
-    result = c.fetchall()
-    conn.close()
-    return result
-
-def count_files():
-    conn = get_db_connection()
-    c = conn.cursor()
-    c.execute("SELECT COUNT(*) FROM files")
-    result = c.fetchone()[0]
-    conn.close()
-    return result
-
-def count_channels():
-    conn = get_db_connection()
-    c = conn.cursor()
-    c.execute("SELECT COUNT(*) FROM channels WHERE status = 'active'")
-    result = c.fetchone()[0]
-    conn.close()
-    return result
-
-def update_channel_status(channel_id, status):
-    conn = get_db_connection()
-    c = conn.cursor()
-    c.execute("UPDATE channels SET status = ? WHERE id = ?", (status, channel_id))
-    conn.commit()
-    conn.close()
-
-def remove_channel(channel_id):
-    conn = get_db_connection()
-    c = conn.cursor()
-    c.execute("DELETE FROM files WHERE channel_id = ?", (channel_id,))
-    c.execute("DELETE FROM channels WHERE id = ?", (channel_id,))
-    conn.commit()
-    conn.close()
-
-def format_time(timestamp):
-    if not timestamp:
-        return "✿ غير معروف"
+# ===================================================================
+#  اختبار التوكن
+# ===================================================================
+def test_bot():
     try:
-        return datetime.fromtimestamp(timestamp).strftime("%Y-%m-%d %H:%M:%S")
+        response = requests.get(f"{TELEGRAM_API}/getMe", timeout=10)
+        if response.status_code == 200:
+            data = response.json()
+            if data.get("ok"):
+                print(f"✅ البوت شغال: @{data['result']['username']}")
+                return True
+        return False
     except:
-        return "✿ غير معروف"
+        return False
 
-def format_size(size):
-    if not size:
-        return "غير معروف"
-    for unit in ['B', 'KB', 'MB', 'GB']:
-        if size < 1024.0:
-            return f"{size:.2f} {unit}"
-        size /= 1024.0
-    return f"{size:.2f} TB"
-
-def is_valid_channel_link(link):
-    patterns = [
-        r'^https?://t\.me/[a-zA-Z0-9_]+$',
-        r'^https?://t\.me/joinchat/[a-zA-Z0-9_-]+$',
-        r'^https?://t\.me/\+[a-zA-Z0-9_-]+$',
-    ]
-    for pattern in patterns:
-        if re.match(pattern, link):
-            return True
-    return False
-
-# ============================================================
-#  🌟 الجزء الثاني – دوال البحث الأساسية 🌟
-# ============================================================
-
-# ================== دالة البحث ==================
-async def search_dark_files_in_channel(channel_id, channel_link, limit=500):
-    logger.info(f"⌬ بدأ البحث في القناة: {channel_link}")
-    found_count = 0
-    
+def clear_webhook():
     try:
+        requests.get(f"{TELEGRAM_API}/deleteWebhook", timeout=10)
+        print("✅ تم حذف الـ Webhook")
+        return True
+    except:
+        return False
+
+# ===================================================================
+#  المتغيرات والمعالجة
+# ===================================================================
+user_conversations = {}
+user_histories = {}
+
+def create_claude_conversation():
+    return CLAUDE_CONFIG["conv_id"], CLAUDE_CONFIG["parent_uuid"]
+
+# ===================================================================
+#  🔥 رد عند الضغط على زر DEV
+# ===================================================================
+def handle_callback(chat_id, callback_id, data, user_id):
+    requests.post(
+        f"{TELEGRAM_API}/answerCallbackQuery",
+        json={"callback_query_id": callback_id},
+        timeout=10
+    )
+    
+    if data == "dev":
+        send_message(
+            chat_id,
+            """<blockquote>
+<u><b>🔥 YACINE_X6 DEV</b></u>
+
+<u><b>👑 أنت الأسطورة يا سيدي ياسين ديف</b></u>
+<u><b>💀 البوت تحت أمرك</b></u>
+<u><b>⚡ القوة لك وحدك</b></u>
+
+✿ ⌘ ⌬ ✪
+</blockquote>""",
+            get_buttons()
+        )
+
+# ===================================================================
+#  التشغيل الرئيسي
+# ===================================================================
+def main():
+    print("="*60)
+    print("✦ DARK HUNTER X CLAUDE ✦")
+    print("⌘ بواسطة: YACINE DEV ⚡")
+    print("🔥 زر DEV أحمر + اقتباس + تغليض")
+    print("="*60)
+    
+    if not test_bot():
+        return
+    
+    clear_webhook()
+    
+    print("🔥 جاري الاستماع للرسائل...")
+    print("📌 اضغط Ctrl+C للإيقاف")
+    print("="*60)
+    
+    last_id = 0
+    
+    while True:
         try:
-            await app.join_chat(channel_link)
-            logger.info(f"✅ تم الانضمام إلى {channel_link}")
-        except Exception as e:
-            logger.warning(f"⚠️ فشل الانضمام إلى {channel_link}: {e}")
-            update_channel_status(channel_id, 'error')
-            return 0
-        
-        try:
-            async for message in app.get_chat_history(channel_link, limit=limit):
-                if message.document:
-                    file_name = message.document.file_name or ""
-                    if file_name.lower().endswith('.dark'):
-                        file_id = message.document.file_id
-                        file_size = message.document.file_size
-                        mime_type = message.document.mime_type or "unknown"
-                        msg_id = message.id
-                        date = message.date.timestamp() if message.date else int(time.time())
+            params = {
+                "offset": last_id + 1,
+                "timeout": 30,
+                "allowed_updates": ["message", "callback_query"]
+            }
+            
+            response = requests.get(
+                f"{TELEGRAM_API}/getUpdates",
+                params=params,
+                timeout=35
+            )
+            
+            if response.status_code != 200:
+                print(f"⚠️ خطأ: {response.status_code}")
+                time.sleep(5)
+                continue
+            
+            updates = response.json()
+            
+            if not updates.get("ok"):
+                print(f"⚠️ خطأ: {updates}")
+                time.sleep(5)
+                continue
+            
+            for update in updates.get("result", []):
+                last_id = update.get("update_id", 0)
+                
+                if "message" in update:
+                    msg = update["message"]
+                    chat_id = msg["chat"]["id"]
+                    user_id = msg["from"]["id"]
+                    text = msg.get("text", "")
+                    username = msg["from"].get("username", "مجهول")
+                    
+                    print(f"📩 رسالة من @{username}: {text[:50]}")
+                    
+                    if str(user_id) not in user_conversations:
+                        conv_id, parent_uuid = create_claude_conversation()
+                        user_conversations[str(user_id)] = {
+                            "conv_id": conv_id,
+                            "parent_uuid": parent_uuid
+                        }
+                        user_histories[str(user_id)] = []
+                    
+                    if text == "/start":
+                        send_message(
+                            chat_id,
+                            """<blockquote>
+<u><b>مـــــرحبـــــا بـــــك</b></u>  
+<u><b>إنـــــي كـــــلـــــود أســـــاعـــــدك فـــــي أي شـــــيء</b></u>  
+
+<u><b>قـــــوتـــــي لا حـــــدود لـــــهـــــا</b></u>  
+<u><b>صـــــنـــــع بـــــأمـــــر ياسين ديف</b></u>  
+
+<u><b>اســـــألـــــنـــــي أي شـــــيء</b></u>  
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+<u><b>الـــــأوامـــــر:</b></u>
+
+<u>/start</u>  <b>بـــــدء الـــــبـــــوت</b>
+<u>/help</u>   <b>الـــــمـــــســـــاعـــــدة</b>
+<u>/new</u>    <b>مـــــحـــــادثـــــة جـــــديـــــدة</b>
+<u>/stats</u>  <b>الـــــإحـــــصـــــائـــــيـــــات</b>
+<u>/dev</u>    <b>مـــــعـــــلـــــومـــــات الـــــمـــــطـــــور</b>
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+💡 <b>اســـــألـــــنـــــي أي شـــــيء</b>
+</blockquote>""",
+                            get_buttons()
+                        )
+                    
+                    elif text == "/help":
+                        send_message(
+                            chat_id,
+                            """<blockquote>
+<u><b>المساعدة</b></u>
+
+<u>/start</u> - <b>بدء البوت</b>
+<u>/help</u> - <b>هذه الرسالة</b>
+<u>/new</u> - <b>محادثة جديدة</b>
+<u>/stats</u> - <b>الإحصائيات</b>
+<u>/dev</u> - <b>معلومات المطور</b>
+</blockquote>""",
+                            get_buttons()
+                        )
+                    
+                    elif text == "/new":
+                        conv_id, parent_uuid = create_claude_conversation()
+                        user_conversations[str(user_id)] = {
+                            "conv_id": conv_id,
+                            "parent_uuid": parent_uuid
+                        }
+                        user_histories[str(user_id)] = []
+                        send_message(
+                            chat_id,
+                            """<blockquote>
+✅ <u><b>تم بدء محادثة جديدة</b></u>
+</blockquote>""",
+                            get_buttons()
+                        )
+                    
+                    elif text == "/stats":
+                        history = user_histories.get(str(user_id), [])
+                        send_message(
+                            chat_id,
+                            f"""<blockquote>
+<u><b>الإحصائيات</b></u>
+
+📊 <b>عدد الرسائل:</b> <u>{len(history)}</u>
+📅 <b>اليوم:</b> <u>{time.strftime("%Y-%m-%d")}</u>
+</blockquote>""",
+                            get_buttons()
+                        )
+                    
+                    elif text == "/dev":
+                        send_message(
+                            chat_id,
+                            """<blockquote>
+<u><b>🔥 YACINE_X6 DEV</b></u>
+
+<u><b> 𝗬𝗔𝗖𝗜𝗡𝗘 𝗗𝗭</b></u>
+<u><b>💀 ياسين عمك ديرها مليح في راسك </b></u>
+</blockquote>""",
+                            get_buttons()
+                        )
+                    
+                    else:
+                        conv = user_conversations[str(user_id)]
                         
-                        add_file(channel_id, file_name, file_id, file_size, mime_type, msg_id, date)
-                        found_count += 1
-                        logger.info(f"✪ تم العثور على ملف: {file_name}")
+                        requests.post(
+                            f"{TELEGRAM_API}/sendChatAction",
+                            json={"chat_id": chat_id, "action": "typing"},
+                            timeout=10
+                        )
                         
-        except FloodWait as e:
-            logger.warning(f"⏳ تم حظر الطلب لمدة {e.value} ثانية")
-            await asyncio.sleep(e.value)
-            return await search_dark_files_in_channel(channel_id, channel_link, limit)
-        except Exception as e:
-            logger.error(f"❌ خطأ في جلب الرسائل: {e}")
-            update_channel_status(channel_id, 'error')
-            return found_count
+                        response, new_uuid = send_to_claude(
+                            text,
+                            conv["conv_id"],
+                            conv["parent_uuid"]
+                        )
+                        
+                        if response:
+                            conv["parent_uuid"] = new_uuid
+                            user_conversations[str(user_id)] = conv
+                            
+                            history = user_histories.get(str(user_id), [])
+                            history.append({"user": text, "assistant": response[:200]})
+                            user_histories[str(user_id)] = history[-10:]
+                            
+                            send_message(
+                                chat_id,
+                                f"""🤖 <b>كلود:</b>
+
+{response}""",
+                                get_buttons()
+                            )
+                        else:
+                            send_message(
+                                chat_id,
+                                """❌ <b>فشل الاتصال بكلود</b>
+✿ حاول مرة أخرى""",
+                                get_buttons()
+                            )
+                
+                elif "callback_query" in update:
+                    cb = update["callback_query"]
+                    chat_id = cb["message"]["chat"]["id"]
+                    cb_id = cb["id"]
+                    data = cb["data"]
+                    user_id = cb["from"]["id"]
+                    
+                    print(f"🔄 كولباك: {data}")
+                    handle_callback(chat_id, cb_id, data, user_id)
             
-        update_channel_status(channel_id, 'done')
-        logger.info(f"⌘ تم الانتهاء من البحث في {channel_link} - وجد {found_count} ملف")
-        return found_count
-        
-    except Exception as e:
-        logger.error(f"✿ خطأ في البحث: {e}")
-        update_channel_status(channel_id, 'error')
-        return found_count
-
-async def search_all_channels(limit=500):
-    channels = get_channels()
-    if not channels:
-        return 0
-    
-    total_files = 0
-    for ch_id, link, title in channels:
-        try:
-            count = await search_dark_files_in_channel(ch_id, link, limit)
-            total_files += count
-            await asyncio.sleep(2)
-        except Exception as e:
-            logger.error(f"✿ خطأ في القناة {link}: {e}")
-    
-    return total_files
-
-# ============================================================
-#  🌟 الجزء الثالث – الكيبوردات والأوامر الرئيسية 🌟
-# ============================================================
-
-# ================== الكيبوردات ==================
-def main_menu_keyboard():
-    return InlineKeyboardMarkup([
-        [InlineKeyboardButton("📂 إضافة قناة", callback_data="add_channel")],
-        [InlineKeyboardButton("🔍 بحث فوري", callback_data="search_now")],
-        [InlineKeyboardButton("📋 قائمة القنوات", callback_data="list_channels")],
-        [InlineKeyboardButton("📄 عرض الملفات", callback_data="list_files")],
-        [InlineKeyboardButton("📊 الإحصائيات", callback_data="stats")],
-        [InlineKeyboardButton("🔄 تحديث البيانات", callback_data="refresh")],
-        [InlineKeyboardButton("❓ مساعدة", callback_data="help")],
-    ])
-
-def back_to_main_keyboard():
-    return InlineKeyboardMarkup([
-        [InlineKeyboardButton("🔙 العودة للقائمة الرئيسية", callback_data="main_menu")]
-    ])
-
-# ================== الأوامر الرئيسية ==================
-@app.on_message(filters.command("start") & filters.private)
-async def start_command(client, message):
-    user = message.from_user
-    welcome_text = f"""
-✿ ⌘ ⌬ ✪ *بوت DARK HUNTER* ✪ ⌬ ⌘ ✿
-
-╭━━━〔 ✿ Y A C I N E   T X ✿ 〕━━━╮
-┃
-┃  ⌬ *بوت استخراج ملفات .dark*
-┃  
-┃  ✪ البوت الأقوى لاستخراج الملفات
-┃  التي تنتهي بـ `.dark` من القنوات.
-┃
-┃  ━━━━━━━━━━━━━━━━━━━━
-┃
-┃  ✿ *المطور:* `Y A C I N E   T X`
-┃  ⌘ *الإصدار:* `v5.0.0`
-┃  ⌬ *الحالة:* `نشط 🟢`
-┃
-┃  ━━━━━━━━━━━━━━━━━━━━
-┃
-┃  📌 *الأوامر المتاحة:*
-┃
-┃  /start  ✿ الصفحة الرئيسية
-┃  /addchannel  ⌘ إضافة قناة
-┃  /searchdark  ⌬ بحث فوري
-┃  /listchannels  ✪ عرض القنوات
-┃  /listfiles  ✿ عرض الملفات
-┃  /stats  ⌘ الإحصائيات
-┃  /removechannel  ⌬ حذف قناة
-┃  /export  ✪ تصدير النتائج
-┃  /help  ✿ المساعدة
-┃
-┃  ━━━━━━━━━━━━━━━━━━━━
-┃
-┃  🎯 *مثال:*
-┃
-┃  /addchannel https://t.me/example
-┃  /searchdark
-┃
-┃  ━━━━━━━━━━━━━━━━━━━━
-┃
-┃  👨‍💻 *المطور:* `Y A C I N E   T X`
-┃  ⌬ جميع الحقوق محفوظة ©
-╰━━━━━━━━━━━━━━━━━━━━━━━━━╯
-"""
-    await message.reply(welcome_text, reply_markup=main_menu_keyboard())
-
-@app.on_message(filters.command("help") & filters.private)
-async def help_command(client, message):
-    help_text = """
-✿ ⌘ ⌬ ✪ *دليل البوت* ✪ ⌬ ⌘ ✿
-
-╭━━━〔 ✿ Y A C I N E   T X ✿ 〕━━━╮
-┃
-┃  ⌬ *الأوامر المتاحة:*
-┃
-┃  /start  ✿ الصفحة الرئيسية
-┃  /addchannel <رابط>  ⌘ إضافة قناة
-┃  /searchdark  ⌬ بحث فوري عن .dark
-┃  /listchannels  ✪ عرض القنوات المضافة
-┃  /listfiles  ✿ عرض الملفات المستخرجة
-┃  /stats  ⌘ الإحصائيات
-┃  /removechannel <id>  ⌬ حذف قناة
-┃  /export  ✪ تصدير النتائج
-┃  /help  ✿ عرض هذه القائمة
-┃
-┃  ━━━━━━━━━━━━━━━━━━━━
-┃
-┃  📌 *نصائح:*
-┃
-┃  ✿ تأكد من أن البوت لديه صلاحية الدخول.
-┃  ⌘ يمكن إضافة قنوات عامة وخاصة.
-┃  ⌬ البحث يستخرج فقط الملفات التي تنتهي بـ `.dark`
-┃  ✪ النتائج تُحفظ في قاعدة البيانات.
-┃
-┃  ━━━━━━━━━━━━━━━━━━━━
-┃
-┃  👨‍💻 *المطور:* `Y A C I N E   T X`
-┃  ⌬ جميع الحقوق محفوظة ©
-╰━━━━━━━━━━━━━━━━━━━━━━━━━╯
-"""
-    await message.reply(help_text, reply_markup=back_to_main_keyboard())
-
-@app.on_message(filters.command("addchannel") & filters.private)
-async def add_channel_command(client, message):
-    try:
-        parts = message.text.split(" ", 1)
-        if len(parts) < 2:
-            await message.reply("❌ *استخدم:* `/addchannel <رابط القناة>`\nمثال: `/addchannel https://t.me/example`")
-            return
-        
-        link = parts[1].strip()
-        
-        if not is_valid_channel_link(link):
-            await message.reply("❌ *رابط غير صحيح!* يرجى إدخال رابط قناة صحيح.")
-            return
-        
-        try:
-            chat = await app.join_chat(link)
-            title = chat.title or "بدون عنوان"
+            time.sleep(1)
             
-            channel_id = add_channel(link, title)
-            if channel_id:
-                await message.reply(f"✅ *تم إضافة القناة بنجاح!*\n📌 *العنوان:* `{title}`\n🆔 *المعرف:* `{channel_id}`")
-            else:
-                await message.reply("⚠️ *القناة موجودة مسبقاً.*")
-        except UserNotParticipant:
-            await message.reply("❌ *لا يمكن الانضمام للقناة!* قد تكون القناة خاصة أو محظورة.")
-        except ChatAdminRequired:
-            await message.reply("❌ *البوت يحتاج صلاحيات إضافية.*")
+        except KeyboardInterrupt:
+            print("\n👋 تم الإيقاف")
+            break
         except Exception as e:
-            await message.reply(f"❌ *خطأ:* `{str(e)}`")
-            
-    except Exception as e:
-        await message.reply(f"❌ *خطأ:* `{str(e)}`")
+            print(f"❌ خطأ: {str(e)}")
+            time.sleep(5)
 
-@app.on_message(filters.command("searchdark") & filters.private)
-async def search_command(client, message):
-    channels = get_channels()
-    if not channels:
-        await message.reply("❌ *لا توجد قنوات مضافة!*\nاستخدم `/addchannel` لإضافة قناة.")
-        return
-    
-    msg = await message.reply("⏳ *جاري البحث عن ملفات `.dark` في جميع القنوات...*\n⏱️ قد يستغرق هذا بعض الوقت.")
-    
-    try:
-        total = await search_all_channels(limit=500)
-        await msg.edit_text(f"✅ *اكتمل البحث!*\n📂 *تم العثور على* `{total}` *ملف.*\nاستخدم `/listfiles` لعرضها.")
-    except Exception as e:
-        await msg.edit_text(f"❌ *خطأ أثناء البحث:* `{str(e)}`")
-
-@app.on_message(filters.command("listchannels") & filters.private)
-async def list_channels_command(client, message):
-    channels = get_channels()
-    if not channels:
-        await message.reply("❌ *لا توجد قنوات مضافة.*")
-        return
-    
-    text = "📋 *قائمة القنوات المضافة:*\n\n"
-    for ch_id, link, title in channels:
-        text += f"🆔 `{ch_id}` ─ ✿ `{title}`\n📍 {link}\n\n"
-    
-    await message.reply(text)
-
-@app.on_message(filters.command("listfiles") & filters.private)
-async def list_files_command(client, message):
-    files = get_all_files()
-    if not files:
-        await message.reply("❌ *لا توجد ملفات مستخرجة بعد.*\nاستخدم `/searchdark` للبحث.")
-        return
-    
-    text = "📂 *الملفات المستخرجة (.dark):*\n\n"
-    for f_id, f_name, f_id_str, f_size, f_date, channel_title in files[:50]:
-        text += f"📄 `{f_name}`\n"
-        text += f"   ✿ الحجم: `{format_size(f_size)}`\n"
-        text += f"   ⌘ القناة: `{channel_title}`\n"
-        text += f"   ⌬ التاريخ: `{format_time(f_date)}`\n\n"
-    
-    total = len(files)
-    if total > 50:
-        text += f"\n📌 *عرض 50 من {total} ملف.* استخدم `/export` لتصدير الكل."
-    
-    await message.reply(text)
-
-@app.on_message(filters.command("stats") & filters.private)
-async def stats_command(client, message):
-    total_files = count_files()
-    total_channels = count_channels()
-    
-    stats_text = f"""
-✿ ⌘ ⌬ ✪ *الإحصائيات* ✪ ⌬ ⌘ ✿
-
-╭━━━〔 ✿ Y A C I N E   T X ✿ 〕━━━╮
-┃
-┃  ⌬ *إحصائيات البوت*
-┃
-┃  ━━━━━━━━━━━━━━━━━━━━
-┃
-┃  ✿ *القنوات المضافة:* `{total_channels}`
-┃  ⌘ *الملفات المستخرجة:* `{total_files}`
-┃  ⌬ *آخر تحديث:* `{format_time(int(time.time()))}`
-┃  ✪ *الحالة:* `نشط 🟢`
-┃
-┃  ━━━━━━━━━━━━━━━━━━━━
-┃
-┃  👨‍💻 *المطور:* `Y A C I N E   T X`
-┃  ⌬ جميع الحقوق محفوظة ©
-╰━━━━━━━━━━━━━━━━━━━━━━━━━╯
-"""
-    await message.reply(stats_text)
-
-@app.on_message(filters.command("export") & filters.private)
-async def export_command(client, message):
-    files = get_all_files()
-    if not files:
-        await message.reply("❌ *لا توجد ملفات لتصديرها.*")
-        return
-    
-    filename = f"dark_files_export_{int(time.time())}.txt"
-    with open(filename, "w", encoding="utf-8") as f:
-        f.write("✿ ⌘ ⌬ ✪ قائمة ملفات .dark المستخرجة ✪ ⌬ ⌘ ✿\n\n")
-        f.write(f"📅 التاريخ: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-        f.write(f"📂 إجمالي الملفات: {len(files)}\n\n")
-        f.write("=" * 60 + "\n\n")
-        
-        for f_id, f_name, f_id_str, f_size, f_date, channel_title in files:
-            f.write(f"📄 اسم الملف: {f_name}\n")
-            f.write(f"📦 الحجم: {format_size(f_size)}\n")
-            f.write(f"📌 القناة: {channel_title}\n")
-            f.write(f"📅 التاريخ: {format_time(f_date)}\n")
-            f.write(f"🆔 File ID: {f_id_str}\n")
-            f.write("-" * 40 + "\n")
-    
-    await message.reply_document(document=filename, caption="📂 *ملف تصدير النتائج*")
-    os.remove(filename)
-
-@app.on_message(filters.command("removechannel") & filters.private)
-async def remove_channel_command(client, message):
-    try:
-        parts = message.text.split(" ", 1)
-        if len(parts) < 2:
-            await message.reply("❌ *استخدم:* `/removechannel <id>`\nاستخدم `/listchannels` لعرض المعرفات.")
-            return
-        
-        channel_id = int(parts[1].strip())
-        remove_channel(channel_id)
-        await message.reply(f"✅ *تم حذف القناة رقم* `{channel_id}`")
-    except ValueError:
-        await message.reply("❌ *المعرف يجب أن يكون رقماً.*")
-    except Exception as e:
-        await message.reply(f"❌ *خطأ:* `{str(e)}`")
-
-# ============================================================
-#  🌟 الجزء الرابع – معالجة الـ Callbacks والتشغيل 🌟
-# ============================================================
-
-# ================== معالجة الـ Callbacks ==================
-@app.on_callback_query()
-async def handle_callback(client, callback_query: CallbackQuery):
-    data = callback_query.data
-    
-    if data == "main_menu":
-        await callback_query.message.edit_text(
-            "✿ ⌘ ⌬ ✪ *القائمة الرئيسية* ✪ ⌬ ⌘ ✿\n\nاختر الخدمة التي تريدها:",
-            reply_markup=main_menu_keyboard()
-        )
-        await callback_query.answer()
-    
-    elif data == "add_channel":
-        await callback_query.message.edit_text(
-            "📌 *أرسل رابط القناة*\n\nمثال: `/addchannel https://t.me/example`",
-            reply_markup=back_to_main_keyboard()
-        )
-        await callback_query.answer()
-    
-    elif data == "search_now":
-        await callback_query.message.edit_text(
-            "⏳ *جاري البحث عن ملفات `.dark`...*\n⏱️ قد يستغرق هذا بعض الوقت.",
-            reply_markup=back_to_main_keyboard()
-        )
-        await callback_query.answer()
-        
-        channels = get_channels()
-        if not channels:
-            await callback_query.message.reply("❌ *لا توجد قنوات مضافة!*")
-            return
-        
-        try:
-            total = await search_all_channels(limit=500)
-            await callback_query.message.reply(
-                f"✅ *اكتمل البحث!*\n📂 *تم العثور على* `{total}` *ملف.*"
-            )
-        except Exception as e:
-            await callback_query.message.reply(f"❌ *خطأ:* `{str(e)}`")
-    
-    elif data == "list_channels":
-        channels = get_channels()
-        if not channels:
-            await callback_query.message.edit_text(
-                "❌ *لا توجد قنوات مضافة.*",
-                reply_markup=back_to_main_keyboard()
-            )
-            await callback_query.answer()
-            return
-        
-        text = "📋 *قائمة القنوات المضافة:*\n\n"
-        for ch_id, link, title in channels:
-            text += f"🆔 `{ch_id}` ─ ✿ `{title}`\n📍 {link}\n\n"
-        
-        await callback_query.message.edit_text(text, reply_markup=back_to_main_keyboard())
-        await callback_query.answer()
-    
-    elif data == "list_files":
-        files = get_all_files()
-        if not files:
-            await callback_query.message.edit_text(
-                "❌ *لا توجد ملفات مستخرجة بعد.*",
-                reply_markup=back_to_main_keyboard()
-            )
-            await callback_query.answer()
-            return
-        
-        text = "📂 *الملفات المستخرجة (.dark):*\n\n"
-        for f_id, f_name, f_id_str, f_size, f_date, channel_title in files[:30]:
-            text += f"📄 `{f_name}`\n"
-            text += f"   ✿ الحجم: `{format_size(f_size)}`\n"
-            text += f"   ⌘ القناة: `{channel_title}`\n\n"
-        
-        total = len(files)
-        if total > 30:
-            text += f"\n📌 *عرض 30 من {total} ملف.*"
-        
-        await callback_query.message.edit_text(text, reply_markup=back_to_main_keyboard())
-        await callback_query.answer()
-    
-    elif data == "stats":
-        total_files = count_files()
-        total_channels = count_channels()
-        
-        stats_text = f"""
-✿ ⌘ ⌬ ✪ *الإحصائيات* ✪ ⌬ ⌘ ✿
-
-╭━━━〔 ✿ Y A C I N E   T X ✿ 〕━━━╮
-┃
-┃  ⌬ *إحصائيات البوت*
-┃
-┃  ━━━━━━━━━━━━━━━━━━━━
-┃
-┃  ✿ *القنوات المضافة:* `{total_channels}`
-┃  ⌘ *الملفات المستخرجة:* `{total_files}`
-┃  ⌬ *آخر تحديث:* `{format_time(int(time.time()))}`
-┃  ✪ *الحالة:* `نشط 🟢`
-┃
-┃  ━━━━━━━━━━━━━━━━━━━━
-┃
-┃  👨‍💻 *المطور:* `Y A C I N E   T X`
-┃  ⌬ جميع الحقوق محفوظة ©
-╰━━━━━━━━━━━━━━━━━━━━━━━━━╯
-"""
-        await callback_query.message.edit_text(stats_text, reply_markup=back_to_main_keyboard())
-        await callback_query.answer()
-    
-    elif data == "refresh":
-        await callback_query.message.edit_text(
-            "🔄 *جاري تحديث البيانات...*",
-            reply_markup=back_to_main_keyboard()
-        )
-        await callback_query.answer()
-        
-        total_files = count_files()
-        total_channels = count_channels()
-        
-        await callback_query.message.reply(
-            f"✅ *تم التحديث!*\n📂 {total_files} ملف\n📌 {total_channels} قناة"
-        )
-    
-    elif data == "help":
-        help_text = """
-✿ ⌘ ⌬ ✪ *دليل البوت* ✪ ⌬ ⌘ ✿
-
-╭━━━〔 ✿ Y A C I N E   T X ✿ 〕━━━╮
-┃
-┃  ⌬ *الأوامر المتاحة:*
-┃
-┃  /start  ✿ الصفحة الرئيسية
-┃  /addchannel <رابط>  ⌘ إضافة قناة
-┃  /searchdark  ⌬ بحث فوري
-┃  /listchannels  ✪ عرض القنوات
-┃  /listfiles  ✿ عرض الملفات
-┃  /stats  ⌘ الإحصائيات
-┃  /removechannel <id>  ⌬ حذف قناة
-┃  /export  ✪ تصدير النتائج
-┃  /help  ✿ المساعدة
-┃
-┃  ━━━━━━━━━━━━━━━━━━━━
-┃
-┃  👨‍💻 *المطور:* `Y A C I N E   T X`
-┃  ⌬ جميع الحقوق محفوظة ©
-╰━━━━━━━━━━━━━━━━━━━━━━━━━╯
-"""
-        await callback_query.message.edit_text(help_text, reply_markup=back_to_main_keyboard())
-        await callback_query.answer()
-    
-    else:
-        await callback_query.answer("⚠️ أمر غير معروف")
-
-# ================== معالجة الرسائل النصية ==================
-@app.on_message(filters.text & filters.private & ~filters.command)
-async def handle_text(client, message):
-    text = message.text.strip()
-    if is_valid_channel_link(text):
-        try:
-            chat = await app.join_chat(text)
-            title = chat.title or "بدون عنوان"
-            channel_id = add_channel(text, title)
-            if channel_id:
-                await message.reply(f"✅ *تم إضافة القناة بنجاح!*\n📌 *العنوان:* `{title}`")
-            else:
-                await message.reply("⚠️ *القناة موجودة مسبقاً.*")
-        except Exception as e:
-            await message.reply(f"❌ *خطأ:* `{str(e)}`")
-    else:
-        await message.reply(
-            "✿ ⌘ ⌬ ✪ *أرسل رابط قناة صحيح*\nأو استخدم الأوامر المتاحة.\n\n📌 `/help` لعرض المساعدة.",
-            reply_markup=back_to_main_keyboard()
-        )
-
-# ============================================================
-#  🌟 نهاية الكود – تشغيل البوت 🌟
-# ============================================================
-
-# ================== تشغيل البوت ==================
 if __name__ == "__main__":
-    print("=" * 60)
-    print("✿ ⌘ ⌬ ✪  بوت DARK HUNTER  ✪ ⌬ ⌘ ✿")
-    print("👨‍💻 المطور: Y A C I N E   T X")
-    print("⌬ الإصدار: v5.0.0")
-    print("✪ يعمل الآن...")
-    print("=" * 60)
-    
     try:
-        app.run()
+        main()
     except KeyboardInterrupt:
-        print("✿ تم إيقاف البوت.")
-    except Exception as e:
-        print(f"✿ خطأ: {e}")
+        print("\n👋 تم الإيقاف")

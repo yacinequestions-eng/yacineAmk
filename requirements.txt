@@ -1,1 +1,4 @@
-requests
+pyTelegramBotAPI==4.29.1
+requests==2.32.4
+requests-toolbelt==1.0.0
+user-agent==0.1.10

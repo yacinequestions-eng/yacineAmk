@@ -1,4 +1,8 @@
-pyTelegramBotAPI==4.29.1
-requests==2.32.4
-requests-toolbelt==1.0.0
-user-agent==0.1.10
+certifi==2024.8.30
+charset-normalizer==3.4.0
+idna==3.10
+requests==2.32.3
+urllib3==2.2.3
+python-telegram-bot==21.5
+python-dotenv==1.0.1
+fake-useragent==1.5.1

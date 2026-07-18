@@ -12,7 +12,7 @@ from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQu
 
 # ========== CONFIG ==========
 TOKEN = "7792196548:AAHaWkIJXqnWxj51IJm0SI4_DWDpiMOCfiU"
-ADMIN_ID = "YOUR_TELEGRAM_ID_HERE"  # يمكنك تركها فارغة للسماح للجميع
+ADMIN_ID = "6936293942"  # يمكنك تركها فارغة للسماح للجميع
 
 # ========== STRIPE CHECKER ==========
 def check_card(card_data):

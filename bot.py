@@ -46,9 +46,23 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(level
 logger = logging.getLogger(__name__)
 
 TOKEN = "7792196548:AAHaWkIJXqnWxj51IJm0SI4_DWDpiMOCfiU"  # 👈 ضع التوكن هنا
-ADMIN_IDS =[6936293942]  # 👈 ضع معرفات المشرفين
+ADMIN_IDS = [6936293942]  # 👈 ضع معرفات المشرفين هنا
 
-# ========== كلاس فك التشفير ==========
+# ========== ملف البيانات ==========
+DATA_FILE = "bot_data.json"
+
+def load_data():
+    try:
+        with open(DATA_FILE, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except:
+        return {"users": {}, "stats": {"total": 0, "success": 0, "failed": 0}, "logs": []}
+
+def save_data(data):
+    with open(DATA_FILE, 'w', encoding='utf-8') as f:
+        json.dump(data, f, indent=4, ensure_ascii=False)
+
+# ========== كلاس فك التشفير (بدون تغيير) ==========
 class EHIConstants:
     L1_KEY = bytes.fromhex("7e1210f7aab956f7a668bda6e57feddb7f84ad840aef8d27b1b969959be3ab6c")
     L2_KEY_STATIC = bytes.fromhex("b2bc617c32d8b9eb1943a5ffa8051eea")
@@ -556,29 +570,69 @@ class DTDecryptor:
         return None
 
 # ==================== دوال البوت ====================
+def is_admin(user_id: int) -> bool:
+    return user_id in ADMIN_IDS
+
+def log_decryption(user_id: int, username: str, filename: str, file_type: str, success: bool):
+    data = load_data()
+    
+    if str(user_id) not in data["users"]:
+        data["users"][str(user_id)] = {"username": username, "files": []}
+    
+    data["users"][str(user_id)]["files"].append({
+        "filename": filename,
+        "type": file_type,
+        "success": success,
+        "date": datetime.now().isoformat()
+    })
+    
+    data["logs"].append({
+        "user_id": user_id,
+        "username": username,
+        "filename": filename,
+        "type": file_type,
+        "success": success,
+        "date": datetime.now().isoformat()
+    })
+    
+    if success:
+        data["stats"]["success"] += 1
+    else:
+        data["stats"]["failed"] += 1
+    data["stats"]["total"] += 1
+    
+    save_data(data)
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if ADMIN_IDS and user_id not in ADMIN_IDS:
-        await update.message.reply_text("⛔ غير مصرح لك.")
+        await update.message.reply_text(
+            "<b>⛔ غير مصرح لك.</b>",
+            parse_mode="HTML"
+        )
         return
     
     keyboard = [
         [InlineKeyboardButton("🔓 فك تشفير EHI", callback_data="decrypt_ehi")],
         [InlineKeyboardButton("🔓 فك تشفير HC", callback_data="decrypt_hc")],
         [InlineKeyboardButton("🔓 فك تشفير DARK", callback_data="decrypt_dark")],
-        [InlineKeyboardButton("📊 الإحصائيات", callback_data="stats")],
-        [InlineKeyboardButton("ℹ️ المساعدة", callback_data="help")],
     ]
+    
+    if is_admin(user_id):
+        keyboard.append([InlineKeyboardButton("⚙️ لوحة الأدمن", callback_data="admin_panel")])
+    
+    keyboard.append([InlineKeyboardButton("📊 الإحصائيات", callback_data="stats")])
+    
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     await update.message.reply_text(
-        "🔥 **DARK DECRYPTOR BOT** 🔥\n"
-        "━━━━━━━━━━━━━━━━━━━━━━━\n"
-        "📌 بوت فك تشفير ملفات:\n"
+        "<b>🔥 DARK DECRYPTOR BOT</b>\n"
+        "<blockquote>بوت فك تشفير ملفات:\n"
         "🔹 EHI (HTTP Injector)\n"
         "🔹 HC (HTTP Custom)\n"
-        "🔹 DARK (Dark Tunnel)\n\n"
+        "🔹 DARK (Dark Tunnel)</blockquote>\n"
         "📤 أرسل الملف أو اختر النوع:",
+        parse_mode="HTML",
         reply_markup=reply_markup
     )
 
@@ -588,91 +642,221 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     user_id = update.effective_user.id
     if ADMIN_IDS and user_id not in ADMIN_IDS:
-        await query.edit_message_text("⛔ غير مصرح لك.")
+        await query.edit_message_text("<b>⛔ غير مصرح لك.</b>", parse_mode="HTML")
         return
     
     action = query.data
     
+    if action == "admin_panel":
+        if not is_admin(user_id):
+            await query.edit_message_text("<b>⛔ غير مصرح لك.</b>", parse_mode="HTML")
+            return
+        await admin_panel(update, context)
+        return
+    
     if action == "decrypt_ehi":
         context.user_data['decrypt_type'] = 'ehi'
         await query.edit_message_text(
-            "📤 **فك تشفير EHI**\n"
-            "━━━━━━━━━━━━━━━━━━━━━━━\n"
-            "أرسل ملف `.ehi` لفك تشفيره."
+            "<b>📤 فك تشفير EHI</b>\n"
+            "<blockquote>أرسل ملف <b>.ehi</b> لفك تشفيره.</blockquote>",
+            parse_mode="HTML"
         )
     elif action == "decrypt_hc":
         context.user_data['decrypt_type'] = 'hc'
         await query.edit_message_text(
-            "📤 **فك تشفير HC**\n"
-            "━━━━━━━━━━━━━━━━━━━━━━━\n"
-            "أرسل ملف `.hc` لفك تشفيره."
+            "<b>📤 فك تشفير HC</b>\n"
+            "<blockquote>أرسل ملف <b>.hc</b> لفك تشفيره.</blockquote>",
+            parse_mode="HTML"
         )
     elif action == "decrypt_dark":
         context.user_data['decrypt_type'] = 'dark'
         await query.edit_message_text(
-            "📤 **فك تشفير DARK**\n"
-            "━━━━━━━━━━━━━━━━━━━━━━━\n"
-            "أرسل ملف `.dark` لفك تشفيره."
+            "<b>📤 فك تشفير DARK</b>\n"
+            "<blockquote>أرسل ملف <b>.dark</b> لفك تشفيره.</blockquote>",
+            parse_mode="HTML"
         )
     elif action == "stats":
         await show_stats(update, context)
-    elif action == "help":
-        await show_help(update, context)
+    elif action == "back_main":
+        await back_to_main(update, context)
+    elif action == "admin_stats":
+        await admin_stats(update, context)
+    elif action == "admin_users":
+        await admin_users(update, context)
+    elif action == "admin_clear":
+        await admin_clear_confirm(update, context)
+    elif action == "admin_clear_confirm":
+        await admin_clear_execute(update, context)
+    elif action == "admin_clear_cancel":
+        await admin_panel(update, context)
+
+async def back_to_main(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await start(update, context)
 
 async def show_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    stats = context.user_data.get('stats', {'total': 0, 'success': 0, 'failed': 0})
+    data = load_data()
+    stats = data.get("stats", {"total": 0, "success": 0, "failed": 0})
+    users_count = len(data.get("users", {}))
     
     message = (
-        "📊 **الإحصائيات**\n"
-        "━━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"📦 المجموع: {stats.get('total', 0)}\n"
+        "<b>📊 الإحصائيات</b>\n"
+        f"<blockquote>📦 المجموع: {stats.get('total', 0)}\n"
         f"✅ الناجحة: {stats.get('success', 0)}\n"
         f"❌ الفاشلة: {stats.get('failed', 0)}\n"
-        f"📈 نسبة النجاح: {int((stats['success']/stats['total'])*100) if stats['total'] > 0 else 0}%"
+        f"📈 نسبة النجاح: {int((stats['success']/stats['total'])*100) if stats['total'] > 0 else 0}%\n"
+        f"👤 المستخدمين: {users_count}</blockquote>"
     )
-    await query.edit_message_text(message)
+    
+    keyboard = [[InlineKeyboardButton("🔙 العودة للقائمة", callback_data="back_main")]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await query.edit_message_text(message, parse_mode="HTML", reply_markup=reply_markup)
 
-async def show_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    message = (
-        "ℹ️ **المساعدة**\n"
-        "━━━━━━━━━━━━━━━━━━━━━━━\n"
-        "📌 **الأوامر:**\n"
-        "/start - عرض القائمة\n"
-        "/stats - عرض الإحصائيات\n"
-        "/help - هذه المساعدة\n\n"
-        "📤 **الملفات المدعومة:**\n"
-        "🔹 .ehi - HTTP Injector\n"
-        "🔹 .hc - HTTP Custom\n"
-        "🔹 .dark - Dark Tunnel\n\n"
-        "🔹 اختر النوع من الأزرار ثم أرسل الملف."
+    user_id = update.effective_user.id
+    
+    if not is_admin(user_id):
+        await query.edit_message_text("<b>⛔ غير مصرح لك.</b>", parse_mode="HTML")
+        return
+    
+    keyboard = [
+        [InlineKeyboardButton("📊 إحصائيات الأدمن", callback_data="admin_stats")],
+        [InlineKeyboardButton("👤 المستخدمين", callback_data="admin_users")],
+        [InlineKeyboardButton("🗑️ تصفير الإحصائيات", callback_data="admin_clear")],
+        [InlineKeyboardButton("🔙 العودة للقائمة", callback_data="back_main")],
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await query.edit_message_text(
+        "<b>⚙️ لوحة الأدمن</b>\n"
+        "<blockquote>اختر الإجراء المناسب:</blockquote>",
+        parse_mode="HTML",
+        reply_markup=reply_markup
     )
-    await query.edit_message_text(message)
+
+async def admin_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    data = load_data()
+    stats = data.get("stats", {"total": 0, "success": 0, "failed": 0})
+    users = data.get("users", {})
+    logs = data.get("logs", [])
+    
+    message = (
+        "<b>📊 إحصائيات الأدمن</b>\n"
+        f"<blockquote>📦 المجموع: {stats.get('total', 0)}\n"
+        f"✅ الناجحة: {stats.get('success', 0)}\n"
+        f"❌ الفاشلة: {stats.get('failed', 0)}\n"
+        f"📈 نسبة النجاح: {int((stats['success']/stats['total'])*100) if stats['total'] > 0 else 0}%\n"
+        f"👤 المستخدمين: {len(users)}\n"
+        f"📋 آخر العمليات: {len(logs[-5:])}</blockquote>"
+    )
+    
+    if logs:
+        last = logs[-1]
+        message += (
+            f"\n<b>آخر عملية:</b>\n"
+            f"<blockquote>👤 {last.get('username', 'غير معروف')}\n"
+            f"📄 {last.get('filename', 'غير معروف')}\n"
+            f"📌 {last.get('type', 'غير معروف')}\n"
+            f"{'✅' if last.get('success') else '❌'} {'نجاح' if last.get('success') else 'فشل'}</blockquote>"
+        )
+    
+    keyboard = [[InlineKeyboardButton("🔙 العودة للوحة الأدمن", callback_data="admin_panel")]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await query.edit_message_text(message, parse_mode="HTML", reply_markup=reply_markup)
+
+async def admin_users(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_action
+    data = load_data()
+    users = data.get("users", {})
+    
+    if not users:
+        await query.edit_message_text(
+            "<b>👤 المستخدمين</b>\n"
+            "<blockquote>لا يوجد مستخدمون حتى الآن.</blockquote>",
+            parse_mode="HTML"
+        )
+        return
+    
+    message = "<b>👤 المستخدمين الذين استخدموا فك التشفير</b>\n"
+    
+    for uid, info in list(users.items())[:15]:
+        username = info.get('username', 'غير معروف')
+        files_count = len(info.get('files', []))
+        success_count = sum(1 for f in info.get('files', []) if f.get('success', False))
+        message += f"\n<blockquote>🆔 {uid}\n👤 {username}\n📄 {files_count} ملف\n✅ {success_count} نجاح</blockquote>"
+    
+    if len(users) > 15:
+        message += f"\n... و {len(users) - 15} مستخدمين آخرين"
+    
+    keyboard = [[InlineKeyboardButton("🔙 العودة للوحة الأدمن", callback_data="admin_panel")]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await query.edit_message_text(message, parse_mode="HTML", reply_markup=reply_markup)
+
+async def admin_clear_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    
+    keyboard = [
+        [InlineKeyboardButton("✅ تأكيد التصفير", callback_data="admin_clear_confirm")],
+        [InlineKeyboardButton("❌ إلغاء", callback_data="admin_clear_cancel")],
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await query.edit_message_text(
+        "<b>⚠️ تحذير!</b>\n"
+        "<blockquote>هل أنت متأكد من تصفير جميع الإحصائيات؟\n"
+        "هذا الإجراء لا يمكن التراجع عنه.</blockquote>",
+        parse_mode="HTML",
+        reply_markup=reply_markup
+    )
+
+async def admin_clear_execute(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    
+    data = {"users": {}, "stats": {"total": 0, "success": 0, "failed": 0}, "logs": []}
+    save_data(data)
+    
+    await query.edit_message_text(
+        "<b>🗑️ تم تصفير الإحصائيات بنجاح.</b>",
+        parse_mode="HTML"
+    )
+    
+    await asyncio.sleep(1)
+    await admin_panel(update, context)
 
 async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
+    username = update.effective_user.username or "غير معروف"
+    
     if ADMIN_IDS and user_id not in ADMIN_IDS:
-        await update.message.reply_text("⛔ غير مصرح لك.")
+        await update.message.reply_text("<b>⛔ غير مصرح لك.</b>", parse_mode="HTML")
         return
     
     file_type = context.user_data.get('decrypt_type')
     if not file_type:
         await update.message.reply_text(
-            "❌ يرجى اختيار نوع الملف أولاً من الأزرار."
+            "<b>❌ يرجى اختيار نوع الملف أولاً من الأزرار.</b>",
+            parse_mode="HTML"
         )
         return
     
     document = update.message.document
     if not document:
-        await update.message.reply_text("❌ يرجى إرسال ملف.")
+        await update.message.reply_text("<b>❌ يرجى إرسال ملف.</b>", parse_mode="HTML")
         return
+    
+    filename = document.file_name or "غير معروف"
     
     # تحميل الملف
     file = await context.bot.get_file(document.file_id)
     file_bytes = await file.download_as_bytearray()
     
-    await update.message.reply_text("⏳ **جاري فك التشفير...**")
+    await update.message.reply_text("<b>⏳ جاري فك التشفير...</b>", parse_mode="HTML")
     
     # فك التشفير
     result = None
@@ -683,35 +867,40 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif file_type == 'dark':
         result = DTDecryptor.execute(bytes(file_bytes))
     
-    # تحديث الإحصائيات
-    stats = context.user_data.get('stats', {'total': 0, 'success': 0, 'failed': 0})
-    stats['total'] += 1
-    
     if result:
-        stats['success'] += 1
-        context.user_data['stats'] = stats
+        log_decryption(user_id, username, filename, file_type, True)
         
-        # تنسيق النتيجة
-        result_text = json.dumps(result, indent=2, ensure_ascii=False)[:4000]
+        result_text = json.dumps(result, indent=2, ensure_ascii=False)
+        
+        if len(result_text) > 4000:
+            result_text = result_text[:3500] + "\n... (مقطع)"
         
         await update.message.reply_text(
-            f"✅ **فك التشفير ناجح!**\n"
-            f"━━━━━━━━━━━━━━━━━━━━━━━\n"
-            f"📄 **النتيجة:**\n```json\n{result_text}\n```",
-            parse_mode='Markdown'
+            f"<b>✅ فك التشفير ناجح!</b>\n"
+            f"<blockquote>📄 الملف: {filename}\n"
+            f"📌 النوع: {file_type.upper()}</blockquote>\n"
+            f"<b>النتيجة:</b>\n"
+            f"<code>{result_text}</code>",
+            parse_mode="HTML"
         )
     else:
-        stats['failed'] += 1
-        context.user_data['stats'] = stats
-        await update.message.reply_text("❌ **فشل فك التشفير!**\nيرجى التأكد من صحة الملف.")
+        log_decryption(user_id, username, filename, file_type, False)
+        await update.message.reply_text(
+            "<b>❌ فشل فك التشفير!</b>\n"
+            "<blockquote>يرجى التأكد من صحة الملف.</blockquote>",
+            parse_mode="HTML"
+        )
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "❌ أمر غير معروف.\n"
-        "استخدم /start للبدء."
+        "<b>❌ أمر غير معروف.</b>\n"
+        "<blockquote>استخدم /start للبدء.</blockquote>",
+        parse_mode="HTML"
     )
 
 # ========== تشغيل البوت ==========
+import asyncio
+
 def main():
     if TOKEN == "YOUR_BOT_TOKEN_HERE":
         print("❌ يرجى إدخال توكن البوت في المتغير TOKEN")
@@ -720,10 +909,8 @@ def main():
     app = Application.builder().token(TOKEN).build()
     
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("stats", show_stats))
-    app.add_handler(CommandHandler("help", show_help))
     
-    app.add_handler(CallbackQueryHandler(handle_buttons, pattern="^(decrypt_ehi|decrypt_hc|decrypt_dark|stats|help)$"))
+    app.add_handler(CallbackQueryHandler(handle_buttons, pattern="^(decrypt_ehi|decrypt_hc|decrypt_dark|stats|back_main|admin_panel|admin_stats|admin_users|admin_clear|admin_clear_confirm|admin_clear_cancel)$"))
     app.add_handler(MessageHandler(filters.Document.ALL, handle_file))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     

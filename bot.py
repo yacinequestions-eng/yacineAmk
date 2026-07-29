@@ -40,17 +40,14 @@ logging.basicConfig(
 )
 log = logging.getLogger("ff_bot")
 
-# ========== التعديل هنا ==========
-# تم وضع التوكن مباشرة في الكود
+# ========== التوكن ==========
 BOT_TOKEN = "7792196548:AAHaWkIJXqnWxj51IJm0SI4_DWDpiMOCfiU"
-# ================================
+# ============================
 
-ADMIN_ONLY = os.environ.get("FF_ADMIN_ONLY", "1").strip() == "1"
-ADMINS = {u.strip() for u in os.environ.get("FF_ADMINS", "").split(",") if u.strip()}
-
-# يمكنك إضافة ايديك هنا كأدمن (اختياري)
-# أضف ايديك في متغير البيئة FF_ADMINS أو عدل السطر التالي:
-# ADMINS = {"6936293942"}  # اتركه كما هو إذا كنت تريد تفعيل خاصية الأدمن فقط
+# ========== تفعيل الأدمن فقط ==========
+ADMIN_ONLY = True  # تفعيل خاصية الأدمن
+ADMINS = {"6936293942"}  # ايديك فقط هو المسموح له
+# =====================================
 
 # Per-chat "currently sending" lock so two /like calls don't overlap
 _busy = {}
@@ -75,14 +72,20 @@ HELP = (
 def _allowed(update: Update) -> bool:
     if not ADMIN_ONLY:
         return True
-    if not ADMINS:
-        return True  # no admins configured -> allow everyone
     user = update.effective_user
-    return bool(user and str(user.id) in ADMINS) or bool(user and user.username in ADMINS)
+    if not user:
+        return False
+    # التحقق من الايدي
+    if str(user.id) in ADMINS:
+        return True
+    # التحقق من اليوزرنيم (اختياري)
+    if user.username and user.username in ADMINS:
+        return True
+    return False
 
 
 async def _denied(update: Update) -> None:
-    await update.message.reply_text("⛔ This bot is restricted to authorized users.")
+    await update.message.reply_text("⛔ هذا البوت مخصص للأدمن فقط. انت لست مخولاً لاستخدامه.")
 
 
 async def start_cmd(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:

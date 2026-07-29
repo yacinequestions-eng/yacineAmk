@@ -40,9 +40,17 @@ logging.basicConfig(
 )
 log = logging.getLogger("ff_bot")
 
-BOT_TOKEN = os.environ.get("FF_BOT_TOKEN", "").strip()
+# ========== التعديل هنا ==========
+# تم وضع التوكن مباشرة في الكود
+BOT_TOKEN = "7792196548:AAHaWkIJXqnWxj51IJm0SI4_DWDpiMOCfiU"
+# ================================
+
 ADMIN_ONLY = os.environ.get("FF_ADMIN_ONLY", "1").strip() == "1"
 ADMINS = {u.strip() for u in os.environ.get("FF_ADMINS", "").split(",") if u.strip()}
+
+# يمكنك إضافة ايديك هنا كأدمن (اختياري)
+# أضف ايديك في متغير البيئة FF_ADMINS أو عدل السطر التالي:
+# ADMINS = {"6936293942"}  # اتركه كما هو إذا كنت تريد تفعيل خاصية الأدمن فقط
 
 # Per-chat "currently sending" lock so two /like calls don't overlap
 _busy = {}

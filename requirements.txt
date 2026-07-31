@@ -1,4 +1,4 @@
-httpx
+aiohttp==3.9.1
 protobuf
 pycryptodome
 python-telegram-bot

@@ -45,18 +45,19 @@ user_data: Dict[int, Dict] = defaultdict(lambda: {
 user_stretch_level: Dict[int, int] = defaultdict(lambda: 1)
 user_waiting_for_username: Dict[int, bool] = defaultdict(lambda: False)
 
-# ==================== دالة تمطيط النصوص (لجميع نصوص البوت) ====================
+# ==================== دالة تمطيط النصوص (بسيطة فقط) ====================
 def stretch_all_text(text: str, level: int = 2) -> str:
     """
-    تطبيق التمطيط على كل النصوص بشكل تلقائي
-    المستوى 2 (متوسط) هو الافتراضي
+    تطبيق التمطيط البسيط على النصوص العربية فقط
+    بدون تشكيلات أو حروف غريبة
+    مثال: مرحبا -> مــرحــبا
     """
     arabic_chars = 'ابتثجحخدذرزسشصضطظعغفقكلمنهوي'
     result = []
     
     for char in text:
         if char in arabic_chars:
-            # تطبيق تمطيط متوسط (خطين)
+            # إضافة خطوط التمطيط
             result.append(char + 'ـ' * level)
         else:
             result.append(char)
@@ -166,15 +167,15 @@ def apply_fancy_arabic(text: str) -> str:
 # ==================== دوال المساعدة ====================
 def format_email_list(emails: List[Dict]) -> str:
     if not emails:
-        return "📭 لــا تــوجــد رِســائــل فــي صــنــدوق الــوارِد"
+        return "📭 لا توجد رسائل في صندوق الوارد"
     
-    result = "📩 صــنــدوق الــوارِد:\n\n"
+    result = "📩 صندوق الوارد:\n\n"
     for i, email in enumerate(emails[:10], 1):
-        mail_from = email.get('mail_from', 'غــيــر مــعــروف')
-        subject = email.get('mail_subject', 'بــدون مــوضــوع')
+        mail_from = email.get('mail_from', 'غير معروف')
+        subject = email.get('mail_subject', 'بدون موضوع')
         date = email.get('mail_date', '')
-        result += f"{i}. مــن: {mail_from}\n"
-        result += f"   الــمــوضــوع: {subject}\n"
+        result += f"{i}. من: {mail_from}\n"
+        result += f"   الموضوع: {subject}\n"
         if date:
             result += f"   📅 {date}\n"
         result += f"   🆔 {email.get('mail_id')}\n\n"
@@ -182,21 +183,21 @@ def format_email_list(emails: List[Dict]) -> str:
 
 def format_email_content(email_data: Dict) -> str:
     if not email_data or 'error' in email_data:
-        return "❌ تــعــذر قــراءة الــرِّســالــة"
+        return "❌ تعذر قراءة الرسالة"
     
-    mail_from = email_data.get('mail_from', 'غــيــر مــعــروف')
-    subject = email_data.get('mail_subject', 'بــدون مــوضــوع')
+    mail_from = email_data.get('mail_from', 'غير معروف')
+    subject = email_data.get('mail_subject', 'بدون موضوع')
     date = email_data.get('mail_date', '')
     body = email_data.get('mail_body', '')
     
     body = re.sub(r'<[^>]+>', '', body)
     body = html.unescape(body)
     
-    result = f"📧 مــن: {mail_from}\n"
-    result += f"📌 الــمــوضــوع: {subject}\n"
+    result = f"📧 من: {mail_from}\n"
+    result += f"📌 الموضوع: {subject}\n"
     if date:
         result += f"📅 {date}\n"
-    result += f"\n📝 الــمــحــتــوى:\n{body}\n"
+    result += f"\n📝 المحتوى:\n{body}\n"
     return result
 
 # ==================== أزرار القائمة الرئيسية ====================
@@ -350,13 +351,13 @@ def get_stretch_level_menu() -> InlineKeyboardMarkup:
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
     welcome_text = f"""
-👋 مــرحــبــاً {stretch_all_text(user.first_name)}!
+👋 مرحباً {stretch_all_text(user.first_name)}!
 
-أنا بــوت مــتــكــامــل يــوفــر لــك:
-📧 بــريــد إلــكــتــرونــي مــؤقــت
-✨ ســتــايــلات نــصــوص احــتــرافــيــة
+أنا بوت متكامل يوفر لك:
+📧 بريد إلكتروني مؤقت
+✨ ستايلات نصوص احترافية
 
-اســتــخــدم الأزرار أدناه لــلــتــنــقــل:
+استخدم الأزرار أدناه للتنقل:
 """
     await update.message.reply_text(
         stretch_all_text(welcome_text),
@@ -374,7 +375,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     
     if data == "back_main":
         await query.edit_message_text(
-            stretch_all_text("🏠 الــقــائــمــة الــرئــيــســيــة:"),
+            stretch_all_text("🏠 القائمة الرئيسية:"),
             reply_markup=get_main_menu()
         )
     
@@ -382,7 +383,6 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         user_waiting_for_username[user_id] = False
         context.user_data['style_action'] = None
         
-        # الحصول على البريد الحالي أو إنشاء جديد
         email_info = user.get('email')
         if not email_info:
             result = await create_email()
@@ -391,20 +391,19 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                 user['email'] = result.get('email_addr')
                 email_info = user['email']
             else:
-                email_info = "لا يــوجــد بــريــد"
+                email_info = "لا يوجد بريد"
         
-        # الحصول على معرف الجلسة مع التحقق من None
         sid_info = user.get('sid')
         if sid_info:
             sid_display = f"{sid_info[:10]}..."
         else:
-            sid_display = "لا يــوجــد جــلــســة"
+            sid_display = "لا يوجد جلسة"
         
         await query.edit_message_text(
             stretch_all_text(
-                f"📧 الــبــريــد الإلــكــتــرونــي: {email_info}\n"
-                f"🆔 مــعــرف الــجــلــســة: {sid_display}\n\n"
-                "اخــتــر إحــدى الــخــيــارات:"
+                f"📧 البريد الإلكتروني: {email_info}\n"
+                f"🆔 معرف الجلسة: {sid_display}\n\n"
+                "اختر إحدى الخيارات:"
             ),
             reply_markup=get_email_menu()
         )
@@ -414,29 +413,29 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         
         await query.edit_message_text(
             stretch_all_text(
-                "✨ اخــتــر ســتــايــل الــنــص الــذي تــريــده:\n\n"
-                "💡 يــمــكــنــك الــرد عــلى أي رِســالــة وتــطــبــيــق الــســتــايــل عــلــيــها"
+                "✨ اختر ستايل النص الذي تريده:\n\n"
+                "💡 يمكنك الرد على أي رسالة وتطبيق الستايل عليها"
             ),
             reply_markup=get_style_menu()
         )
     
     elif data == "info":
         info_text = """
-ℹ️ <b>مــعــلــومــات الــبــوت</b>
+ℹ️ <b>معلومات البوت</b>
 
-<b>📧 الــبــريــد الــمــؤقــت</b>
-• يــســتــخــدم Guerrilla Mail API
-• إيــمــيــلات مــؤقــتــة لــمــدة ســاعــة
-• يــمــكــنــك تــعــيــيــن اســم مــســتــخــدم مــخــصــص
+<b>📧 البريد المؤقت</b>
+• يستخدم Guerrilla Mail API
+• إيميلات مؤقتة لمدة ساعة
+• يمكنك تعيين اسم مستخدم مخصص
 
-<b>✨ ســتــايــلات الــنــصــوص</b>
-• تــغــلــيــض (Bold)
-• تــمــطــيــط - 3 مــســتــويــات
-• اقــتــبــاس
-• مــائــل (Italic)
-• مــزخــرف عــربــي
+<b>✨ ستايلات النصوص</b>
+• تغليض (Bold)
+• تمطيط - 3 مستويات
+• اقتباس
+• مائل (Italic)
+• مزخرف عربي
 
-<b>🔧 الــتــقــنــيــات</b>
+<b>🔧 التقنيات</b>
 • Python 3.10+
 • python-telegram-bot 20.0+
 • Guerrilla Mail API
@@ -457,14 +456,14 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             user['emails'] = []
             await query.edit_message_text(
                 stretch_all_text(
-                    f"✅ تــم إنــشــاء بــريــد جــديــد:\n📧 {user['email']}\n\n"
-                    f"🆔 مــعــرف الــجــلــســة: {user['sid'][:15]}..."
+                    f"✅ تم إنشاء بريد جديد:\n📧 {user['email']}\n\n"
+                    f"🆔 معرف الجلسة: {user['sid'][:15]}..."
                 ),
                 reply_markup=get_email_menu()
             )
         else:
             await query.edit_message_text(
-                stretch_all_text(f"❌ فــشــل إنــشــاء الــبــريــد: {result.get('error')}"),
+                stretch_all_text(f"❌ فشل إنشاء البريد: {result.get('error')}"),
                 reply_markup=get_email_menu()
             )
     
@@ -474,8 +473,8 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         
         await query.edit_message_text(
             stretch_all_text(
-                "✏️ أرســل اســم الــمــســتــخــدم الــمــطــلــوب (أحــرف وأرقــام فــقــط):\n\n"
-                "مــثــال: myemail"
+                "✏️ أرسل اسم المستخدم المطلوب (أحرف وأرقام فقط):\n\n"
+                "مثال: myemail"
             ),
             reply_markup=InlineKeyboardMarkup([[
                 InlineKeyboardButton(stretch_all_text("🔙 إلغاء"), callback_data="email_menu", style="danger")
@@ -486,7 +485,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         sid = user.get('sid')
         if not sid:
             await query.edit_message_text(
-                stretch_all_text("❌ لا يــوجــد بــريــد مــؤقــت. قــم بإنــشــاء بــريــد أوّلاً."),
+                stretch_all_text("❌ لا يوجد بريد مؤقت. قم بإنشاء بريد أولاً."),
                 reply_markup=get_email_menu()
             )
             return
@@ -494,7 +493,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         result = await get_email_list(sid)
         if 'error' in result:
             await query.edit_message_text(
-                stretch_all_text(f"❌ فــشــل جــلــب الــرِّســائــل: {result.get('error')}"),
+                stretch_all_text(f"❌ فشل جلب الرسائل: {result.get('error')}"),
                 reply_markup=get_email_menu()
             )
             return
@@ -504,7 +503,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         
         keyboard = []
         for i, email in enumerate(emails[:5], 1):
-            subject = email.get('mail_subject', 'بــدون مــوضــوع')[:20]
+            subject = email.get('mail_subject', 'بدون موضوع')[:20]
             mail_id = email.get('mail_id')
             keyboard.append([
                 InlineKeyboardButton(
@@ -531,7 +530,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         
         if not sid:
             await query.edit_message_text(
-                stretch_all_text("❌ لا يــوجــد بــريــد مــؤقــت."),
+                stretch_all_text("❌ لا يوجد بريد مؤقت."),
                 reply_markup=get_email_menu()
             )
             return
@@ -539,7 +538,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         result = await fetch_email(sid, email_id)
         if 'error' in result:
             await query.edit_message_text(
-                stretch_all_text(f"❌ فــشــل قــراءة الــرِّســالــة: {result.get('error')}"),
+                stretch_all_text(f"❌ فشل قراءة الرسالة: {result.get('error')}"),
                 reply_markup=get_email_menu()
             )
             return
@@ -554,11 +553,11 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         )
     
     elif data == "copy_email":
-        email = user.get('email', 'لا يــوجــد بــريــد')
+        email = user.get('email', 'لا يوجد بريد')
         await query.edit_message_text(
             stretch_all_text(
-                f"📋 الــبــريــد الإلــكــتــرونــي:\n<code>{email}</code>\n\n"
-                "تــم نــســخ الــبــريــد لــلــحــافــظــة (اضــغــط لــلــنــســخ)"
+                f"📋 البريد الإلكتروني:\n<code>{email}</code>\n\n"
+                "تم نسخ البريد للحافظة (اضغط للنسخ)"
             ),
             reply_markup=get_email_menu(),
             parse_mode=constants.ParseMode.HTML
@@ -570,12 +569,12 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             user['email'] = None
             user['emails'] = []
             await query.edit_message_text(
-                stretch_all_text("🗑️ تــم حــذف الــبــريــد الــحــالــي بــنــجــاح"),
+                stretch_all_text("🗑️ تم حذف البريد الحالي بنجاح"),
                 reply_markup=get_email_menu()
             )
         else:
             await query.edit_message_text(
-                stretch_all_text("❌ لا يــوجــد بــريــد لــحــذفــه"),
+                stretch_all_text("❌ لا يوجد بريد لحذفه"),
                 reply_markup=get_email_menu()
             )
     
@@ -586,8 +585,8 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         
         await query.edit_message_text(
             stretch_all_text(
-                "🔤 أرســل الــنــص الــذي تــريــد تــطــبــيــق ســتــايــل <b>التغليض</b> عــلــيــه:\n\n"
-                "أو قــم بــالــرد عــلى أي رِســالــة وســيــتــم تــطــبــيــق الــســتــايــل عــلــيــها"
+                "🔤 أرسل النص الذي تريد تطبيق ستايل التغليض عليه:\n\n"
+                "أو قم بالرد على أي رسالة وسيتم تطبيق الستايل عليها"
             ),
             reply_markup=InlineKeyboardMarkup([[
                 InlineKeyboardButton(stretch_all_text("🔙 رجوع"), callback_data="style_menu", style="primary")
@@ -600,7 +599,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         context.user_data['style_action'] = 'stretch'
         
         await query.edit_message_text(
-            stretch_all_text("📏 اخــتــر مــســتــوى الــتــمــطــيــط:"),
+            stretch_all_text("📏 اختر مستوى التمطيط:"),
             reply_markup=get_stretch_level_menu()
         )
     
@@ -610,8 +609,8 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         
         await query.edit_message_text(
             stretch_all_text(
-                "❝ أرســل الــنــص الــذي تــريــد تــطــبــيــق ســتــايــل <b>الاقتباس</b> عــلــيــه:\n\n"
-                "أو قــم بــالــرد عــلى أي رِســالــة وســيــتــم تــطــبــيــق الــســتــايــل عــلــيــها"
+                "❝ أرسل النص الذي تريد تطبيق ستايل الاقتباس عليه:\n\n"
+                "أو قم بالرد على أي رسالة وسيتم تطبيق الستايل عليها"
             ),
             reply_markup=InlineKeyboardMarkup([[
                 InlineKeyboardButton(stretch_all_text("🔙 رجوع"), callback_data="style_menu", style="primary")
@@ -625,8 +624,8 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         
         await query.edit_message_text(
             stretch_all_text(
-                "✒️ أرســل الــنــص الــذي تــريــد تــطــبــيــق ســتــايــل <b>المائل</b> عــلــيــه:\n\n"
-                "أو قــم بــالــرد عــلى أي رِســالــة وســيــتــم تــطــبــيــق الــســتــايــل عــلــيــها"
+                "✒️ أرسل النص الذي تريد تطبيق ستايل المائل عليه:\n\n"
+                "أو قم بالرد على أي رسالة وسيتم تطبيق الستايل عليها"
             ),
             reply_markup=InlineKeyboardMarkup([[
                 InlineKeyboardButton(stretch_all_text("🔙 رجوع"), callback_data="style_menu", style="primary")
@@ -640,8 +639,8 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         
         await query.edit_message_text(
             stretch_all_text(
-                "✨ أرســل الــنــص الــذي تــريــد تــطــبــيــق ســتــايــل <b>المزخرف العربي</b> عــلــيــه:\n\n"
-                "أو قــم بــالــرد عــلى أي رِســالــة وســيــتــم تــطــبــيــق الــســتــايــل عــلــيــها"
+                "✨ أرسل النص الذي تريد تطبيق ستايل المزخرف العربي عليه:\n\n"
+                "أو قم بالرد على أي رسالة وسيتم تطبيق الستايل عليها"
             ),
             reply_markup=InlineKeyboardMarkup([[
                 InlineKeyboardButton(stretch_all_text("🔙 رجوع"), callback_data="style_menu", style="primary")
@@ -654,12 +653,12 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         user_stretch_level[user_id] = level
         context.user_data['style_action'] = 'stretch'
         
-        level_names = {1: "خــفــيــف 🟢", 2: "مــتــوســط 🟡", 3: "قــوي 🔴"}
+        level_names = {1: "خفيف 🟢", 2: "متوسط 🟡", 3: "قوي 🔴"}
         await query.edit_message_text(
             stretch_all_text(
-                f"📏 تــم اخــتــيــار الــمــســتــوى: {level_names[level]}\n\n"
-                "أرســل الــنــص الــذي تــريــد تــطــبــيــق <b>التمطيط</b> عــلــيــه:\n"
-                "أو قــم بــالــرد عــلى أي رِســالــة وســيــتــم تــطــبــيــق الــســتــايــل عــلــيــها"
+                f"📏 تم اختيار المستوى: {level_names[level]}\n\n"
+                "أرسل النص الذي تريد تطبيق التمطيط عليه:\n"
+                "أو قم بالرد على أي رسالة وسيتم تطبيق الستايل عليها"
             ),
             reply_markup=InlineKeyboardMarkup([
                 [
@@ -682,7 +681,7 @@ async def handle_set_username(update: Update, context: ContextTypes.DEFAULT_TYPE
     
     if not re.match(r'^[a-zA-Z0-9_]+$', username):
         await message.reply_text(
-            stretch_all_text("❌ اســم الــمــســتــخــدم يــجــب أن يــحــتــوي عــلى أحــرف وأرقــام فــقــط (a-z, A-Z, 0-9, _)"),
+            stretch_all_text("❌ اسم المستخدم يجب أن يحتوي على أحرف وأرقام فقط (a-z, A-Z, 0-9, _)"),
             reply_markup=get_email_menu()
         )
         return
@@ -690,7 +689,7 @@ async def handle_set_username(update: Update, context: ContextTypes.DEFAULT_TYPE
     sid = user_data[user_id].get('sid')
     if not sid:
         await message.reply_text(
-            stretch_all_text("❌ لا يــوجــد بــريــد مــؤقــت. قــم بإنــشــاء بــريــد أوّلاً."),
+            stretch_all_text("❌ لا يوجد بريد مؤقت. قم بإنشاء بريد أولاً."),
             reply_markup=get_email_menu()
         )
         user_waiting_for_username[user_id] = False
@@ -702,14 +701,14 @@ async def handle_set_username(update: Update, context: ContextTypes.DEFAULT_TYPE
         user_data[user_id]['email_user'] = username
         await message.reply_text(
             stretch_all_text(
-                f"✅ تــم تــعــيــيــن اســم الــمــســتــخــدم: {username}\n"
-                f"📧 الــبــريــد الــجــديــد: {result.get('email_addr')}"
+                f"✅ تم تعيين اسم المستخدم: {username}\n"
+                f"📧 البريد الجديد: {result.get('email_addr')}"
             ),
             reply_markup=get_email_menu()
         )
     else:
         await message.reply_text(
-            stretch_all_text(f"❌ فــشــل تــعــيــيــن الــاســم: {result.get('error')}"),
+            stretch_all_text(f"❌ فشل تعيين الاسم: {result.get('error')}"),
             reply_markup=get_email_menu()
         )
     
@@ -728,18 +727,18 @@ async def handle_style_message(update: Update, context: ContextTypes.DEFAULT_TYP
     if message.reply_to_message:
         text_to_style = message.reply_to_message.text or message.reply_to_message.caption
         if not text_to_style:
-            await message.reply_text(stretch_all_text("❌ الــرِّســالــة الــمــقــابــلة لا تــحــتــوي عــلى نــص"))
+            await message.reply_text(stretch_all_text("❌ الرسالة المقابلة لا تحتوي على نص"))
             return
     else:
         text_to_style = message.text
         if not text_to_style:
-            await message.reply_text(stretch_all_text("❌ أرســل نــصــاً لــلــتــنــســيــق"))
+            await message.reply_text(stretch_all_text("❌ أرسل نصاً للتنسيق"))
             return
     
     style_action = context.user_data.get('style_action')
     if not style_action:
         await message.reply_text(
-            stretch_all_text("❌ يــرجــى اخــتــيــار ســتــايــل أوّلاً مــن الــقــائــمــة"),
+            stretch_all_text("❌ يرجى اختيار ستايل أولاً من القائمة"),
             reply_markup=get_main_menu()
         )
         return
@@ -750,27 +749,27 @@ async def handle_style_message(update: Update, context: ContextTypes.DEFAULT_TYP
     try:
         if style_action == 'bold':
             styled_text = apply_bold(text_to_style)
-            style_name = "تــغــلــيــض"
+            style_name = "تغليض"
         elif style_action == 'italic':
             styled_text = apply_italic(text_to_style)
-            style_name = "مــائــل"
+            style_name = "مائل"
         elif style_action == 'quote':
             styled_text = apply_quote(text_to_style)
-            style_name = "اقــتــبــاس"
+            style_name = "اقتباس"
         elif style_action == 'fancy':
             styled_text = apply_fancy_arabic(text_to_style)
-            style_name = "مــزخــرف عــربــي"
+            style_name = "مزخرف عربي"
         elif style_action == 'stretch':
             level = user_stretch_level.get(user_id, 1)
             styled_text = apply_stretch(text_to_style, level)
-            level_names = {1: "خــفــيــف", 2: "مــتــوســط", 3: "قــوي"}
-            style_name = f"تــمــطــيــط ({level_names[level]})"
+            level_names = {1: "خفيف", 2: "متوسط", 3: "قوي"}
+            style_name = f"تمطيط ({level_names[level]})"
         else:
-            await message.reply_text(stretch_all_text("❌ ســتــايــل غــيــر مــعــروف"))
+            await message.reply_text(stretch_all_text("❌ ستايل غير معروف"))
             return
         
         await message.reply_text(
-            stretch_all_text(f"✨ <b>الــســتــايــل: {style_name}</b>\n\n{styled_text}"),
+            stretch_all_text(f"✨ الستايل: {style_name}\n\n{styled_text}"),
             parse_mode=constants.ParseMode.HTML,
             reply_markup=InlineKeyboardMarkup([[
                 InlineKeyboardButton(stretch_all_text("🔙 رجوع للستايلات"), callback_data="style_menu", style="primary")
@@ -780,7 +779,7 @@ async def handle_style_message(update: Update, context: ContextTypes.DEFAULT_TYP
         context.user_data['style_action'] = None
         
     except Exception as e:
-        await message.reply_text(stretch_all_text(f"❌ حــدث خــطــأ أثــنــاء تــطــبــيــق الــســتــايــل: {str(e)}"))
+        await message.reply_text(stretch_all_text(f"❌ حدث خطأ أثناء تطبيق الستايل: {str(e)}"))
 
 # ==================== الدالة الرئيسية ====================
 def main() -> None:

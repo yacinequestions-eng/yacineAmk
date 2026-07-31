@@ -44,6 +44,9 @@ user_data: Dict[int, Dict] = defaultdict(lambda: {
 
 user_stretch_level: Dict[int, int] = defaultdict(lambda: 1)
 
+# حالة المستخدمين لتحديد ما إذا كان في وضع تعيين اسم المستخدم
+user_waiting_for_username: Dict[int, bool] = defaultdict(lambda: False)
+
 # ==================== دوال Guerrilla Mail API ====================
 GUERRILLA_API_BASE = "https://api.guerrillamail.com/ajax.php"
 
@@ -357,6 +360,10 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         )
     
     elif data == "email_menu":
+        # إلغاء أي حالة سابقة
+        user_waiting_for_username[user_id] = False
+        context.user_data['style_action'] = None
+        
         email_info = user.get('email', 'لا يوجد بريد')
         sid_info = user.get('sid', 'لا يوجد جلسة')
         
@@ -375,6 +382,9 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         )
     
     elif data == "style_menu":
+        # إلغاء أي حالة سابقة
+        user_waiting_for_username[user_id] = False
+        
         await query.edit_message_text(
             "✨ اختر ستايل النص الذي تريده:\n\n"
             "💡 يمكنك الرد على أي رسالة وتطبيق الستايل عليها",
@@ -428,11 +438,16 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             )
     
     elif data == "set_username":
+        # تفعيل حالة انتظار اسم المستخدم
+        user_waiting_for_username[user_id] = True
+        # إلغاء أي ستايل نشط
+        context.user_data['style_action'] = None
+        
         await query.edit_message_text(
             "✏️ أرسل اسم المستخدم المطلوب (أحرف وأرقام فقط):\n\n"
             "مثال: myemail",
             reply_markup=InlineKeyboardMarkup([[
-                InlineKeyboardButton("🔙 رجوع", callback_data="email_menu", style="primary")
+                InlineKeyboardButton("🔙 إلغاء", callback_data="email_menu", style="danger")
             ]])
         )
     
@@ -531,8 +546,12 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                 reply_markup=get_email_menu()
             )
     
+    # ==================== أزرار الستايلات ====================
     elif data == "style_bold":
+        # إلغاء أي حالة سابقة
+        user_waiting_for_username[user_id] = False
         context.user_data['style_action'] = 'bold'
+        
         await query.edit_message_text(
             "🔤 أرسل النص الذي تريد تطبيق ستايل <b>التغليض</b> عليه:\n\n"
             "أو قم بالرد على أي رسالة وسيتم تطبيق الستايل عليها",
@@ -543,14 +562,20 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         )
     
     elif data == "style_stretch":
+        # إلغاء أي حالة سابقة
+        user_waiting_for_username[user_id] = False
         context.user_data['style_action'] = 'stretch'
+        
         await query.edit_message_text(
             "📏 اختر مستوى التمطيط:",
             reply_markup=get_stretch_level_menu()
         )
     
     elif data == "style_quote":
+        # إلغاء أي حالة سابقة
+        user_waiting_for_username[user_id] = False
         context.user_data['style_action'] = 'quote'
+        
         await query.edit_message_text(
             "❝ أرسل النص الذي تريد تطبيق ستايل <b>الاقتباس</b> عليه:\n\n"
             "أو قم بالرد على أي رسالة وسيتم تطبيق الستايل عليها",
@@ -561,7 +586,10 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         )
     
     elif data == "style_italic":
+        # إلغاء أي حالة سابقة
+        user_waiting_for_username[user_id] = False
         context.user_data['style_action'] = 'italic'
+        
         await query.edit_message_text(
             "✒️ أرسل النص الذي تريد تطبيق ستايل <b>المائل</b> عليه:\n\n"
             "أو قم بالرد على أي رسالة وسيتم تطبيق الستايل عليها",
@@ -572,7 +600,10 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         )
     
     elif data == "style_fancy":
+        # إلغاء أي حالة سابقة
+        user_waiting_for_username[user_id] = False
         context.user_data['style_action'] = 'fancy'
+        
         await query.edit_message_text(
             "✨ أرسل النص الذي تريد تطبيق ستايل <b>المزخرف العربي</b> عليه:\n\n"
             "أو قم بالرد على أي رسالة وسيتم تطبيق الستايل عليها",
@@ -601,10 +632,61 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             parse_mode=constants.ParseMode.HTML
         )
 
-# ==================== معالج الرسائل ====================
-async def handle_style_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+# ==================== معالج تعيين اسم المستخدم ====================
+async def handle_set_username(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """معالج تعيين اسم المستخدم - منفصل عن الستايلات"""
     message = update.message
     user_id = update.effective_user.id
+    
+    # التحقق من أن المستخدم في وضع تعيين اسم المستخدم
+    if not user_waiting_for_username[user_id]:
+        return
+    
+    username = message.text.strip()
+    
+    if not re.match(r'^[a-zA-Z0-9_]+$', username):
+        await message.reply_text(
+            "❌ اسم المستخدم يجب أن يحتوي على أحرف وأرقام فقط (a-z, A-Z, 0-9, _)",
+            reply_markup=get_email_menu()
+        )
+        return
+    
+    sid = user_data[user_id].get('sid')
+    if not sid:
+        await message.reply_text(
+            "❌ لا يوجد بريد مؤقت. قم بإنشاء بريد أولاً.",
+            reply_markup=get_email_menu()
+        )
+        user_waiting_for_username[user_id] = False
+        return
+    
+    result = await set_email_user(sid, username)
+    if 'error' not in result:
+        user_data[user_id]['email'] = result.get('email_addr')
+        user_data[user_id]['email_user'] = username
+        await message.reply_text(
+            f"✅ تم تعيين اسم المستخدم: {username}\n"
+            f"📧 البريد الجديد: {result.get('email_addr')}",
+            reply_markup=get_email_menu()
+        )
+    else:
+        await message.reply_text(
+            f"❌ فشل تعيين الاسم: {result.get('error')}",
+            reply_markup=get_email_menu()
+        )
+    
+    # إلغاء حالة انتظار اسم المستخدم
+    user_waiting_for_username[user_id] = False
+
+# ==================== معالج الرسائل للستايلات ====================
+async def handle_style_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """معالج تطبيق الستايلات على النصوص"""
+    message = update.message
+    user_id = update.effective_user.id
+    
+    # إذا كان المستخدم في وضع تعيين اسم المستخدم، نتجاهل الستايل
+    if user_waiting_for_username[user_id]:
+        return
     
     text_to_style = None
     
@@ -665,42 +747,6 @@ async def handle_style_message(update: Update, context: ContextTypes.DEFAULT_TYP
     except Exception as e:
         await message.reply_text(f"❌ حدث خطأ أثناء تطبيق الستايل: {str(e)}")
 
-# ==================== معالج تعيين اسم المستخدم ====================
-async def handle_set_username(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    message = update.message
-    user_id = update.effective_user.id
-    username = message.text.strip()
-    
-    if not re.match(r'^[a-zA-Z0-9_]+$', username):
-        await message.reply_text(
-            "❌ اسم المستخدم يجب أن يحتوي على أحرف وأرقام فقط (a-z, A-Z, 0-9, _)",
-            reply_markup=get_email_menu()
-        )
-        return
-    
-    sid = user_data[user_id].get('sid')
-    if not sid:
-        await message.reply_text(
-            "❌ لا يوجد بريد مؤقت. قم بإنشاء بريد أولاً.",
-            reply_markup=get_email_menu()
-        )
-        return
-    
-    result = await set_email_user(sid, username)
-    if 'error' not in result:
-        user_data[user_id]['email'] = result.get('email_addr')
-        user_data[user_id]['email_user'] = username
-        await message.reply_text(
-            f"✅ تم تعيين اسم المستخدم: {username}\n"
-            f"📧 البريد الجديد: {result.get('email_addr')}",
-            reply_markup=get_email_menu()
-        )
-    else:
-        await message.reply_text(
-            f"❌ فشل تعيين الاسم: {result.get('error')}",
-            reply_markup=get_email_menu()
-        )
-
 # ==================== الدالة الرئيسية ====================
 def main() -> None:
     application = Application.builder().token(BOT_TOKEN).build()
@@ -708,6 +754,15 @@ def main() -> None:
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CallbackQueryHandler(button_callback))
     
+    # معالج تعيين اسم المستخدم (يأتي أولاً للتحكم بالأولوية)
+    application.add_handler(
+        MessageHandler(
+            filters.TEXT & ~filters.COMMAND,
+            handle_set_username
+        )
+    )
+    
+    # معالج الستايلات
     application.add_handler(
         MessageHandler(
             filters.TEXT & ~filters.COMMAND,
